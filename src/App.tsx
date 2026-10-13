@@ -1,14 +1,56 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense, lazy } from 'react';
 import { Navbar } from './components/layout/Navbar';
 import { Footer } from './components/layout/Footer';
 import { OnboardingModal } from './components/onboarding/OnboardingModal';
 import type { ExperienceRoute } from './types/navigation';
 import { HomeLanding } from './experiences/home/HomeLanding';
-import { GestureStudio } from './experiences/studio/GestureStudio';
-import { ParticleUniversePlaceholder } from './experiences/particles/ParticleUniversePlaceholder';
-import { GestureRunnerPlaceholder } from './experiences/runner/GestureRunnerPlaceholder';
-import { AboutExperience } from './experiences/about/AboutExperience';
 import { GestureProvider } from './core/engine/GestureContext';
+
+// Route-level code splitting for experiences not required initially
+const GestureStudio = lazy(() =>
+  import('./experiences/studio/GestureStudio').then((m) => ({ default: m.GestureStudio }))
+);
+const ParticleUniversePlaceholder = lazy(() =>
+  import('./experiences/particles/ParticleUniversePlaceholder').then((m) => ({
+    default: m.ParticleUniversePlaceholder,
+  }))
+);
+const GestureRunnerPlaceholder = lazy(() =>
+  import('./experiences/runner/GestureRunnerPlaceholder').then((m) => ({
+    default: m.GestureRunnerPlaceholder,
+  }))
+);
+const AboutExperience = lazy(() =>
+  import('./experiences/about/AboutExperience').then((m) => ({ default: m.AboutExperience }))
+);
+
+const RouteLoadingFallback: React.FC<{ title: string }> = ({ title }) => (
+  <div
+    role="status"
+    aria-live="polite"
+    style={{
+      flex: 1,
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: '60vh',
+      gap: '16px',
+    }}
+  >
+    <div className="led-indicator live" style={{ width: '14px', height: '14px' }} />
+    <span
+      style={{
+        fontFamily: 'var(--font-mono)',
+        fontSize: '12px',
+        color: 'var(--electric-cyan)',
+        letterSpacing: '0.08em',
+      }}
+    >
+      LOADING {title.toUpperCase()}...
+    </span>
+  </div>
+);
 
 export const AppContent: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<ExperienceRoute>('home');
@@ -40,13 +82,29 @@ export const AppContent: React.FC = () => {
   const renderActiveRoute = () => {
     switch (currentRoute) {
       case 'studio':
-        return <GestureStudio />;
+        return (
+          <Suspense fallback={<RouteLoadingFallback title="Gesture Studio" />}>
+            <GestureStudio />
+          </Suspense>
+        );
       case 'particles':
-        return <ParticleUniversePlaceholder />;
+        return (
+          <Suspense fallback={<RouteLoadingFallback title="Particle Universe" />}>
+            <ParticleUniversePlaceholder />
+          </Suspense>
+        );
       case 'runner':
-        return <GestureRunnerPlaceholder />;
+        return (
+          <Suspense fallback={<RouteLoadingFallback title="Gesture Runner" />}>
+            <GestureRunnerPlaceholder />
+          </Suspense>
+        );
       case 'about':
-        return <AboutExperience />;
+        return (
+          <Suspense fallback={<RouteLoadingFallback title="Technical Specification" />}>
+            <AboutExperience />
+          </Suspense>
+        );
       case 'home':
       default:
         return (

@@ -1,4 +1,23 @@
-import * as THREE from 'three';
+import {
+  Scene,
+  PerspectiveCamera,
+  WebGLRenderer,
+  ACESFilmicToneMapping,
+  AmbientLight,
+  DirectionalLight,
+  PointLight,
+  Color,
+  GridHelper,
+  SphereGeometry,
+  BoxGeometry,
+  TorusGeometry,
+  MeshStandardMaterial,
+  MeshBasicMaterial,
+  Group,
+  Mesh,
+  type BufferGeometry,
+  type LineBasicMaterial,
+} from 'three';
 import type { GestureState } from '../../core/types';
 import { GestureStudioMath, DEFAULT_STUDIO_CONFIG } from './gestureMath';
 
@@ -13,29 +32,29 @@ export interface StudioSceneCallbacks {
 
 export class StudioSceneController {
   private container: HTMLElement | null = null;
-  private renderer: THREE.WebGLRenderer | null = null;
-  private scene: THREE.Scene | null = null;
-  private camera: THREE.PerspectiveCamera | null = null;
+  private renderer: WebGLRenderer | null = null;
+  private scene: Scene | null = null;
+  private camera: PerspectiveCamera | null = null;
   private animationFrameId: number | null = null;
   private resizeObserver: ResizeObserver | null = null;
 
   // Meshes and groups
-  private objectGroup: THREE.Group | null = null;
-  private solidMesh: THREE.Mesh | null = null;
-  private wireframeMesh: THREE.Mesh | null = null;
-  private accentPointLight: THREE.PointLight | null = null;
-  private gridHelper: THREE.GridHelper | null = null;
+  private objectGroup: Group | null = null;
+  private solidMesh: Mesh | null = null;
+  private wireframeMesh: Mesh | null = null;
+  private accentPointLight: PointLight | null = null;
+  private gridHelper: GridHelper | null = null;
 
   // Geometries cache
   private geometries: {
-    sphere: { solid: THREE.BufferGeometry; wire: THREE.BufferGeometry };
-    cube: { solid: THREE.BufferGeometry; wire: THREE.BufferGeometry };
-    torus: { solid: THREE.BufferGeometry; wire: THREE.BufferGeometry };
+    sphere: { solid: BufferGeometry; wire: BufferGeometry };
+    cube: { solid: BufferGeometry; wire: BufferGeometry };
+    torus: { solid: BufferGeometry; wire: BufferGeometry };
   } | null = null;
 
   // Materials
-  private solidMaterial: THREE.MeshStandardMaterial | null = null;
-  private wireframeMaterial: THREE.MeshBasicMaterial | null = null;
+  private solidMaterial: MeshStandardMaterial | null = null;
+  private wireframeMaterial: MeshBasicMaterial | null = null;
 
   // Interactive state
   private currentShape: StudioPresetShape = 'sphere';
@@ -94,24 +113,24 @@ export class StudioSceneController {
     this.container = container;
 
     // 1. Scene
-    this.scene = new THREE.Scene();
+    this.scene = new Scene();
 
     // 2. Camera
     const width = container.clientWidth || 800;
     const height = container.clientHeight || 600;
-    this.camera = new THREE.PerspectiveCamera(45, width / height, 0.1, 100);
+    this.camera = new PerspectiveCamera(45, width / height, 0.1, 100);
     this.camera.position.set(0, 0, 7.2);
 
     // 3. Renderer with antialiasing and safe device pixel ratio
     try {
-      this.renderer = new THREE.WebGLRenderer({
+      this.renderer = new WebGLRenderer({
         antialias: true,
         alpha: true,
         powerPreference: 'high-performance',
       });
       this.renderer.setSize(width, height);
       this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
-      this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      this.renderer.toneMapping = ACESFilmicToneMapping;
       this.renderer.toneMappingExposure = 1.15;
 
       const canvas = this.renderer.domElement;
@@ -141,19 +160,19 @@ export class StudioSceneController {
     const canvas = this.renderer.domElement;
 
     // 4. Lights
-    const ambientLight = new THREE.AmbientLight(0x0a1628, 1.8);
+    const ambientLight = new AmbientLight(0x0a1628, 1.8);
     this.scene.add(ambientLight);
 
-    const keyLight = new THREE.DirectionalLight(0xffffff, 2.2);
+    const keyLight = new DirectionalLight(0xffffff, 2.2);
     keyLight.position.set(5, 7, 6);
     this.scene.add(keyLight);
 
-    const rimLight = new THREE.DirectionalLight(0x00d2ff, 1.6);
+    const rimLight = new DirectionalLight(0x00d2ff, 1.6);
     rimLight.position.set(-6, -4, -4);
     this.scene.add(rimLight);
 
-    this.accentPointLight = new THREE.PointLight(
-      new THREE.Color(this.currentColorHex),
+    this.accentPointLight = new PointLight(
+      new Color(this.currentColorHex),
       2.5,
       12
     );
@@ -161,48 +180,48 @@ export class StudioSceneController {
     this.scene.add(this.accentPointLight);
 
     // 5. Sci-Fi Research Grid Platform
-    this.gridHelper = new THREE.GridHelper(12, 24, 0x00d2ff, 0x1e293b);
+    this.gridHelper = new GridHelper(12, 24, 0x00d2ff, 0x1e293b);
     this.gridHelper.position.y = -2.8;
     this.scene.add(this.gridHelper);
 
     // 6. Geometries
     this.geometries = {
       sphere: {
-        solid: new THREE.SphereGeometry(1.6, 64, 64),
-        wire: new THREE.SphereGeometry(1.64, 32, 32),
+        solid: new SphereGeometry(1.6, 64, 64),
+        wire: new SphereGeometry(1.64, 32, 32),
       },
       cube: {
-        solid: new THREE.BoxGeometry(2.3, 2.3, 2.3, 8, 8, 8),
-        wire: new THREE.BoxGeometry(2.36, 2.36, 2.36, 4, 4, 4),
+        solid: new BoxGeometry(2.3, 2.3, 2.3, 8, 8, 8),
+        wire: new BoxGeometry(2.36, 2.36, 2.36, 4, 4, 4),
       },
       torus: {
-        solid: new THREE.TorusGeometry(1.45, 0.52, 32, 100),
-        wire: new THREE.TorusGeometry(1.48, 0.54, 16, 50),
+        solid: new TorusGeometry(1.45, 0.52, 32, 100),
+        wire: new TorusGeometry(1.48, 0.54, 16, 50),
       },
     };
 
     // 7. Materials
-    this.solidMaterial = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(0x0c1a2e),
+    this.solidMaterial = new MeshStandardMaterial({
+      color: new Color(0x0c1a2e),
       roughness: 0.22,
       metalness: 0.82,
-      emissive: new THREE.Color(this.currentColorHex),
+      emissive: new Color(this.currentColorHex),
       emissiveIntensity: 0.38,
     });
 
-    this.wireframeMaterial = new THREE.MeshBasicMaterial({
-      color: new THREE.Color(this.currentColorHex),
+    this.wireframeMaterial = new MeshBasicMaterial({
+      color: new Color(this.currentColorHex),
       wireframe: true,
       transparent: true,
       opacity: 0.38,
     });
 
     // 8. Meshes and Group
-    this.objectGroup = new THREE.Group();
+    this.objectGroup = new Group();
     const activeGeom = this.geometries[this.currentShape];
 
-    this.solidMesh = new THREE.Mesh(activeGeom.solid, this.solidMaterial);
-    this.wireframeMesh = new THREE.Mesh(activeGeom.wire, this.wireframeMaterial);
+    this.solidMesh = new Mesh(activeGeom.solid, this.solidMaterial);
+    this.wireframeMesh = new Mesh(activeGeom.wire, this.wireframeMaterial);
 
     this.objectGroup.add(this.solidMesh);
     this.objectGroup.add(this.wireframeMesh);
@@ -248,7 +267,7 @@ export class StudioSceneController {
 
   public setColor(hexColor: string): void {
     this.currentColorHex = hexColor;
-    const threeColor = new THREE.Color(hexColor);
+    const threeColor = new Color(hexColor);
 
     if (this.solidMaterial) {
       this.solidMaterial.emissive.set(threeColor);
@@ -263,7 +282,7 @@ export class StudioSceneController {
       const materials = Array.isArray(this.gridHelper.material)
         ? this.gridHelper.material
         : [this.gridHelper.material];
-      const primaryLineMat = materials[0] as THREE.LineBasicMaterial | undefined;
+      const primaryLineMat = materials[0] as LineBasicMaterial | undefined;
       if (primaryLineMat && 'color' in primaryLineMat) {
         primaryLineMat.color.set(threeColor);
       }

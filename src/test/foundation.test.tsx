@@ -23,28 +23,28 @@ describe('ZMotion Foundation Tests', () => {
     expect(screen.getAllByText('Play Cyber Runner').length).toBeGreaterThan(0);
   });
 
-  it('navigates to Gesture Studio when clicking studio action', () => {
+  it('navigates to Gesture Studio when clicking studio action', async () => {
     render(<App />);
     const studioBtn = screen.getAllByText('Open 3D Gesture Studio')[0];
     fireEvent.click(studioBtn);
-    expect(screen.getByText('GESTURE STUDIO')).toBeDefined();
-    expect(screen.getByText('SHAPE PRESETS')).toBeDefined();
+    expect(await screen.findByText('GESTURE STUDIO')).toBeDefined();
+    expect(await screen.findByText('SHAPE PRESETS')).toBeDefined();
   });
 
-  it('navigates to Particle Universe when clicking particles action', () => {
+  it('navigates to Particle Universe when clicking particles action', async () => {
     render(<App />);
     const particlesBtn = screen.getAllByText('Launch Particle Universe')[0];
     fireEvent.click(particlesBtn);
-    expect(screen.getByText('PARTICLE UNIVERSE')).toBeDefined();
-    expect(screen.getByText(/MORPHING CONSTRUCTS/i)).toBeDefined();
+    expect(await screen.findByText('PARTICLE UNIVERSE')).toBeDefined();
+    expect(await screen.findByText(/MORPHING CONSTRUCTS/i)).toBeDefined();
   });
 
-  it('navigates to Gesture Runner when clicking runner action', () => {
+  it('navigates to Gesture Runner when clicking runner action', async () => {
     render(<App />);
     const runnerBtn = screen.getAllByText('Play Cyber Runner')[0];
     fireEvent.click(runnerBtn);
-    expect(screen.getByText('GESTURE RUNNER')).toBeDefined();
-    expect(screen.getByText(/INPUT CONTROLLER/i)).toBeDefined();
+    expect(await screen.findByText('GESTURE RUNNER')).toBeDefined();
+    expect(await screen.findByText(/INPUT CONTROLLER/i)).toBeDefined();
   });
 
   it('opens and closes the onboarding modal when Controls button is clicked', () => {
