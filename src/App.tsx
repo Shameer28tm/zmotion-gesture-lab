@@ -8,8 +8,9 @@ import { GestureStudioPlaceholder } from './experiences/studio/GestureStudioPlac
 import { ParticleUniversePlaceholder } from './experiences/particles/ParticleUniversePlaceholder';
 import { GestureRunnerPlaceholder } from './experiences/runner/GestureRunnerPlaceholder';
 import { AboutExperience } from './experiences/about/AboutExperience';
+import { GestureProvider } from './core/engine/GestureContext';
 
-export const App: React.FC = () => {
+export const AppContent: React.FC = () => {
   const [currentRoute, setCurrentRoute] = useState<ExperienceRoute>('home');
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
 
@@ -83,6 +84,14 @@ export const App: React.FC = () => {
         onClose={() => setIsOnboardingOpen(false)}
       />
     </div>
+  );
+};
+
+export const App: React.FC = () => {
+  return (
+    <GestureProvider>
+      <AppContent />
+    </GestureProvider>
   );
 };
 
