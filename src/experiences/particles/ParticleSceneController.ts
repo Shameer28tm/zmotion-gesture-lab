@@ -334,15 +334,15 @@ export class ParticleSceneController {
       this.targetRotation.y += 0.28 * delta;
     }
 
-    // 2. Smooth Lerp Rotation
-    const rotLerpFactor = Math.min(1, 10 * delta);
+    // 2. Smooth Lerp Rotation with responsive tracking
+    const rotLerpFactor = Math.min(1, 18 * delta);
     this.currentRotation.x += (this.targetRotation.x - this.currentRotation.x) * rotLerpFactor;
     this.currentRotation.y += (this.targetRotation.y - this.currentRotation.y) * rotLerpFactor;
     this.pointsMesh.rotation.x = this.currentRotation.x;
     this.pointsMesh.rotation.y = this.currentRotation.y;
 
     // 3. Smooth Lerp Expansion on GPU scale
-    const expLerpFactor = Math.min(1, 12 * delta);
+    const expLerpFactor = Math.min(1, 18 * delta);
     this.currentExpansion += (this.targetExpansion - this.currentExpansion) * expLerpFactor;
     this.pointsMesh.scale.setScalar(this.currentExpansion);
 

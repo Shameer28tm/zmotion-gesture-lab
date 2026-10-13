@@ -476,8 +476,8 @@ export class StudioSceneController {
       this.targetRotation.y += 0.35 * delta;
     }
 
-    // 2. Smooth Lerp Rotation
-    const rotLerpFactor = Math.min(1, 10 * delta);
+    // 2. Smooth Lerp Rotation with responsive tracking
+    const rotLerpFactor = Math.min(1, 18 * delta);
     this.currentRotation.x +=
       (this.targetRotation.x - this.currentRotation.x) * rotLerpFactor;
     this.currentRotation.y +=
@@ -487,7 +487,7 @@ export class StudioSceneController {
     this.objectGroup.rotation.y = this.currentRotation.y;
 
     // 3. Smooth Lerp Scale
-    const scaleLerpFactor = Math.min(1, 12 * delta);
+    const scaleLerpFactor = Math.min(1, 18 * delta);
     this.currentScale += (this.targetScale - this.currentScale) * scaleLerpFactor;
     this.objectGroup.scale.setScalar(this.currentScale);
 

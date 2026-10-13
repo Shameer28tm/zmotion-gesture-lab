@@ -15,9 +15,9 @@ const ParticleUniverse = lazy(() =>
     default: m.ParticleUniverse,
   }))
 );
-const GestureRunnerPlaceholder = lazy(() =>
-  import('./experiences/runner/GestureRunnerPlaceholder').then((m) => ({
-    default: m.GestureRunnerPlaceholder,
+const GestureRunner = lazy(() =>
+  import('./experiences/runner/GestureRunner').then((m) => ({
+    default: m.GestureRunner,
   }))
 );
 const AboutExperience = lazy(() =>
@@ -96,7 +96,7 @@ export const AppContent: React.FC = () => {
       case 'runner':
         return (
           <Suspense fallback={<RouteLoadingFallback title="Gesture Runner" />}>
-            <GestureRunnerPlaceholder />
+            <GestureRunner />
           </Suspense>
         );
       case 'about':

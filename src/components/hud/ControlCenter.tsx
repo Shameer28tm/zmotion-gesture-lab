@@ -28,6 +28,7 @@ export const ControlCenter: React.FC<ControlCenterProps> = ({
   const {
     cameraStatus,
     gestureState,
+    diagnostics,
     errorMessage,
     isRunning,
     startEngine,
@@ -216,6 +217,43 @@ export const ControlCenter: React.FC<ControlCenterProps> = ({
         </div>
       </div>
 
+      {/* Live Engine Diagnostics (FPS, Latency, Accel) */}
+      {isRunning && (
+        <div
+          style={{
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: '6px 10px',
+            borderRadius: '6px',
+            background: 'rgba(0, 210, 255, 0.04)',
+            border: '1px solid rgba(0, 210, 255, 0.15)',
+            fontFamily: 'var(--font-mono)',
+            fontSize: '10px',
+            color: 'var(--text-secondary)',
+          }}
+        >
+          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+            <span style={{ color: 'var(--text-muted)' }}>LATENCY:</span>
+            <span style={{ color: 'var(--electric-cyan)', fontWeight: 700 }}>
+              {diagnostics.inferenceDurationMs}ms
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+            <span style={{ color: 'var(--text-muted)' }}>VISION FPS:</span>
+            <span style={{ color: '#fff', fontWeight: 700 }}>
+              ~{diagnostics.inferenceFps}
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: '4px', alignItems: 'center' }}>
+            <span style={{ color: 'var(--text-muted)' }}>ACCEL:</span>
+            <span style={{ color: diagnostics.delegate === 'GPU' ? '#00ff88' : '#ffaa00', fontWeight: 700 }}>
+              {diagnostics.delegate}
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Real-time Pinch Diagnostics Gauge */}
       {gestureState.handDetected && (
         <div
@@ -301,6 +339,31 @@ export const ControlCenter: React.FC<ControlCenterProps> = ({
             step={0.05}
             onChange={setSmoothing}
           />
+
+          <div
+            style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              fontSize: '12px',
+              color: 'var(--text-secondary)',
+            }}
+          >
+            <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <Sparkles size={14} color="var(--electric-cyan)" /> Fast Motion Anti-Lag
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => engine.setConfig({ adaptiveSmoothing: !config.adaptiveSmoothing })}
+              style={{
+                padding: '4px 8px',
+                color: config.adaptiveSmoothing ? 'var(--electric-cyan)' : 'var(--text-muted)',
+              }}
+            >
+              {config.adaptiveSmoothing ? 'Active' : 'Disabled'}
+            </Button>
+          </div>
 
           {showOverlayToggle && (
             <div

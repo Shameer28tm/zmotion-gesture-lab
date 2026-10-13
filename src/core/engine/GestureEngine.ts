@@ -5,6 +5,7 @@ import { GestureSmoother } from '../gestures/GestureSmoother';
 import {
   DEFAULT_ENGINE_CONFIG,
   type CameraStatus,
+  type EngineDiagnostics,
   type GestureEngineConfig,
   type GestureState,
   type GestureType,
@@ -19,6 +20,7 @@ export type GestureFrameListener = (
 export type GestureStateListener = (state: GestureState) => void;
 export type FistTriggerListener = () => void;
 export type PointingTriggerListener = () => void;
+export type DiagnosticsListener = (diagnostics: EngineDiagnostics) => void;
 
 export class GestureEngine {
   private static instance: GestureEngine | null = null;
@@ -39,6 +41,27 @@ export class GestureEngine {
   private stateListeners: Set<GestureStateListener> = new Set();
   private fistListeners: Set<FistTriggerListener> = new Set();
   private pointingListeners: Set<PointingTriggerListener> = new Set();
+  private diagnosticsListeners: Set<DiagnosticsListener> = new Set();
+
+  // Inference optimization & telemetry tracking
+  private lastInferenceTime = 0;
+  private lastVideoTime = -1;
+  private lastRawLandmarks: HandLandmarks | null = null;
+  private inferenceFrameCount = 0;
+  private lastFpsCalcTime = performance.now();
+  private currentInferenceFps = 0;
+
+  private diagnostics: EngineDiagnostics = {
+    inferenceDurationMs: 0,
+    inferenceFps: 0,
+    cameraFps: 0,
+    trackingConfidence: 0,
+    handDetected: false,
+    activeGesture: 'NONE',
+    modelReady: false,
+    delegate: 'GPU',
+    isOfflineFallback: false,
+  };
 
   public constructor(config: GestureEngineConfig = DEFAULT_ENGINE_CONFIG) {
     this.config = { ...config };
@@ -80,6 +103,15 @@ export class GestureEngine {
     return { ...this.currentState };
   }
 
+  public getDiagnostics(): EngineDiagnostics {
+    return {
+      ...this.diagnostics,
+      modelReady: this.landmarkerService.isInitialized(),
+      delegate: this.landmarkerService.getDelegate(),
+      isOfflineFallback: this.landmarkerService.isFallbackMode(),
+    };
+  }
+
   public getVideoElement(): HTMLVideoElement | null {
     return this.cameraManager.getVideoElement();
   }
@@ -88,9 +120,17 @@ export class GestureEngine {
     return this.cameraManager.onStatusChange(listener);
   }
 
+  public onDiagnostics(listener: DiagnosticsListener): () => void {
+    this.diagnosticsListeners.add(listener);
+    listener(this.getDiagnostics());
+    return () => {
+      this.diagnosticsListeners.delete(listener);
+    };
+  }
+
   /**
    * High-frequency listener: runs per animation frame for 3D render loops.
-   * Does NOT trigger React state updates.
+   * Decoupled from inference rate to keep rendering at full display Hz.
    */
   public onFrame(listener: GestureFrameListener): () => void {
     this.frameListeners.add(listener);
@@ -111,9 +151,6 @@ export class GestureEngine {
     };
   }
 
-  /**
-   * Discrete event listener for debounced fist triggers (shape cycle or runner jump).
-   */
   public onFistTrigger(listener: FistTriggerListener): () => void {
     this.fistListeners.add(listener);
     return () => {
@@ -121,9 +158,6 @@ export class GestureEngine {
     };
   }
 
-  /**
-   * Discrete event listener for debounced pointing triggers (single trigger upon pointing).
-   */
   public onPointingTrigger(listener: PointingTriggerListener): () => void {
     this.pointingListeners.add(listener);
     return () => {
@@ -131,34 +165,41 @@ export class GestureEngine {
     };
   }
 
-  /**
-   * Attaches the live webcam video element to the given DOM container.
-   */
   public attachCameraToContainer(container: HTMLElement): void {
     this.cameraManager.attachToContainer(container);
   }
 
-  /**
-   * Detaches the live webcam video element from a DOM container.
-   */
   public detachCameraFromContainer(container?: HTMLElement): void {
     this.cameraManager.detachFromContainer(container);
   }
 
+  /**
+   * High-efficiency parallel startup:
+   * Acquires camera stream and downloads/initializes vision model concurrently.
+   */
   public async start(customVideo?: HTMLVideoElement): Promise<void> {
     if (this.isRunning) return;
 
-    // 1. Initialize HandLandmarker if needed
-    if (!this.landmarkerService.isInitialized()) {
-      await this.landmarkerService.initialize();
-    }
+    // 1. Concurrently initialize HandLandmarker and request Camera stream
+    const modelPromise = !this.landmarkerService.isInitialized()
+      ? this.landmarkerService.initialize({
+          detectionConfidence: this.config.detectionConfidence,
+          trackingConfidence: this.config.trackingConfidence,
+        })
+      : Promise.resolve();
 
-    // 2. Start Camera stream
-    await this.cameraManager.start(customVideo);
+    const cameraPromise = this.cameraManager.start(customVideo);
 
-    // 3. Start RAF loop
+    // Run both in parallel to minimize startup latency
+    await Promise.all([modelPromise, cameraPromise]);
+
+    // 2. Start high-performance decoupled loop
     this.isRunning = true;
     this.smoother.reset();
+    this.lastInferenceTime = 0;
+    this.lastVideoTime = -1;
+    this.lastFpsCalcTime = performance.now();
+    this.inferenceFrameCount = 0;
     this.animationFrameId = requestAnimationFrame(this.processLoop);
   }
 
@@ -177,106 +218,163 @@ export class GestureEngine {
       handDetected: false,
       handedness: 'Unknown',
     };
+    this.lastRawLandmarks = null;
     this.notifyStateChange();
   }
 
+  /**
+   * High-Performance Process Loop:
+   * Throttles inference to match video frame availability (~30 FPS),
+   * preventing redundant computation while keeping 3D transforms smooth.
+   */
   private processLoop(now: number): void {
     if (!this.isRunning) return;
 
     const video = this.cameraManager.getVideoElement();
     if (video && video.readyState >= 2) {
-      const result = this.landmarkerService.detectForVideo(video, now);
+      const minInterval = 1000 / (this.config.maxInferenceFps || 30);
+      const isNewFrame = video.currentTime !== this.lastVideoTime;
+      const elapsedSinceInference = now - this.lastInferenceTime;
 
-      if (result && result.landmarks && result.landmarks.length > 0) {
-        const rawLandmarks = result.landmarks[0] as HandLandmarks;
-        const handedness =
-          result.handedness && result.handedness[0] && result.handedness[0][0]
-            ? (result.handedness[0][0].categoryName as 'Left' | 'Right')
-            : 'Unknown';
+      // Only execute heavy MediaPipe inference when a fresh video frame has arrived
+      // and minimum interval has elapsed
+      if (isNewFrame && elapsedSinceInference >= minInterval) {
+        const infStart = performance.now();
+        const result = this.landmarkerService.detectForVideo(video, now);
+        const infDuration = performance.now() - infStart;
 
-        // 1. Classify raw gesture
-        const { gesture: rawGesture, metrics: rawMetrics } = GestureClassifier.classify(
-          rawLandmarks,
-          this.config
-        );
+        this.lastVideoTime = video.currentTime;
+        this.lastInferenceTime = now;
+        this.inferenceFrameCount++;
 
-        // 2. Smooth continuous metrics and filter state transitions
-        const { stableGesture, smoothedMetrics, fistTriggered, pointingTriggered } = this.smoother.process(
-          rawGesture,
-          rawMetrics,
-          now
-        );
+        // Calculate approximate inference FPS over 1-second rolling windows
+        if (now - this.lastFpsCalcTime >= 1000) {
+          this.currentInferenceFps = Math.round(
+            (this.inferenceFrameCount * 1000) / (now - this.lastFpsCalcTime)
+          );
+          this.inferenceFrameCount = 0;
+          this.lastFpsCalcTime = now;
+        }
 
-        this.currentState = {
-          activeGesture: stableGesture,
-          metrics: smoothedMetrics,
-          handDetected: true,
-          handedness,
-        };
+        if (result && result.landmarks && result.landmarks.length > 0) {
+          const rawLandmarks = result.landmarks[0] as HandLandmarks;
+          this.lastRawLandmarks = rawLandmarks;
+          const handedness =
+            result.handedness && result.handedness[0] && result.handedness[0][0]
+              ? (result.handedness[0][0].categoryName as 'Left' | 'Right')
+              : 'Unknown';
 
-        // Notify discrete fist trigger listeners if fired
-        if (fistTriggered) {
-          this.fistListeners.forEach((listener) => {
+          // 1. Classify raw gesture
+          const { gesture: rawGesture, metrics: rawMetrics } = GestureClassifier.classify(
+            rawLandmarks,
+            this.config
+          );
+
+          // 2. Adaptive velocity-aware smoothing
+          const { stableGesture, smoothedMetrics, fistTriggered, pointingTriggered } =
+            this.smoother.process(rawGesture, rawMetrics, now);
+
+          this.currentState = {
+            activeGesture: stableGesture,
+            metrics: smoothedMetrics,
+            handDetected: true,
+            handedness,
+          };
+
+          // Update diagnostics
+          this.diagnostics = {
+            inferenceDurationMs: Math.round(infDuration),
+            inferenceFps: this.currentInferenceFps || 30,
+            cameraFps: 30,
+            trackingConfidence: Number((smoothedMetrics.confidence || 0.95).toFixed(2)),
+            handDetected: true,
+            activeGesture: stableGesture,
+            modelReady: true,
+            delegate: this.landmarkerService.getDelegate(),
+            isOfflineFallback: this.landmarkerService.isFallbackMode(),
+          };
+
+          // Trigger discrete fist callbacks
+          if (fistTriggered) {
+            this.fistListeners.forEach((listener) => {
+              try {
+                listener();
+              } catch (err) {
+                console.error('Error in fist trigger listener:', err);
+              }
+            });
+          }
+
+          // Trigger discrete pointing callbacks
+          if (pointingTriggered) {
+            this.pointingListeners.forEach((listener) => {
+              try {
+                listener();
+              } catch (err) {
+                console.error('Error in pointing trigger listener:', err);
+              }
+            });
+          }
+        } else {
+          // Hand not in view
+          this.lastRawLandmarks = null;
+          const { stableGesture, smoothedMetrics } = this.smoother.process(
+            'NONE',
+            GestureClassifier.createEmptyMetrics(),
+            now
+          );
+
+          this.currentState = {
+            activeGesture: stableGesture,
+            metrics: smoothedMetrics,
+            handDetected: false,
+            handedness: 'Unknown',
+          };
+
+          this.diagnostics = {
+            inferenceDurationMs: Math.round(infDuration),
+            inferenceFps: this.currentInferenceFps || 30,
+            cameraFps: 30,
+            trackingConfidence: 0,
+            handDetected: false,
+            activeGesture: 'NONE',
+            modelReady: true,
+            delegate: this.landmarkerService.getDelegate(),
+            isOfflineFallback: this.landmarkerService.isFallbackMode(),
+          };
+        }
+
+        // Notify low-frequency React state listeners only on meaningful transitions
+        if (
+          this.currentState.activeGesture !== this.previousReportedGesture ||
+          this.currentState.handDetected !== this.previousHandDetected
+        ) {
+          this.previousReportedGesture = this.currentState.activeGesture;
+          this.previousHandDetected = this.currentState.handDetected;
+          this.notifyStateChange();
+        }
+
+        // Broadcast telemetry diagnostics if listeners are registered
+        if (this.diagnosticsListeners.size > 0) {
+          const diagCopy = { ...this.diagnostics };
+          this.diagnosticsListeners.forEach((listener) => {
             try {
-              listener();
+              listener(diagCopy);
             } catch (err) {
-              console.error('Error in fist trigger listener:', err);
+              console.error('Error in diagnostics listener:', err);
             }
           });
         }
+      }
 
-        // Notify discrete pointing trigger listeners if fired
-        if (pointingTriggered) {
-          this.pointingListeners.forEach((listener) => {
-            try {
-              listener();
-            } catch (err) {
-              console.error('Error in pointing trigger listener:', err);
-            }
-          });
+      // Always deliver smoothed 3D frame updates to renderers on every RAF tick
+      this.frameListeners.forEach((listener) => {
+        try {
+          listener(this.currentState, this.lastRawLandmarks);
+        } catch (err) {
+          console.error('Error in frame listener:', err);
         }
-
-        // Notify 3D frame listeners with smoothed metrics
-        this.frameListeners.forEach((listener) => {
-          try {
-            listener(this.currentState, rawLandmarks);
-          } catch (err) {
-            console.error('Error in frame listener:', err);
-          }
-        });
-      } else {
-        // Hand not in view
-        const { stableGesture, smoothedMetrics } = this.smoother.process(
-          'NONE',
-          GestureClassifier.createEmptyMetrics(),
-          now
-        );
-
-        this.currentState = {
-          activeGesture: stableGesture,
-          metrics: smoothedMetrics,
-          handDetected: false,
-          handedness: 'Unknown',
-        };
-
-        this.frameListeners.forEach((listener) => {
-          try {
-            listener(this.currentState, null);
-          } catch (err) {
-            console.error('Error in frame listener:', err);
-          }
-        });
-      }
-
-      // Check for low-frequency state changes to notify React
-      if (
-        this.currentState.activeGesture !== this.previousReportedGesture ||
-        this.currentState.handDetected !== this.previousHandDetected
-      ) {
-        this.previousReportedGesture = this.currentState.activeGesture;
-        this.previousHandDetected = this.currentState.handDetected;
-        this.notifyStateChange();
-      }
+      });
     }
 
     this.animationFrameId = requestAnimationFrame(this.processLoop);
@@ -301,6 +399,7 @@ export class GestureEngine {
     this.stateListeners.clear();
     this.fistListeners.clear();
     this.pointingListeners.clear();
+    this.diagnosticsListeners.clear();
     GestureEngine.instance = null;
   }
 }

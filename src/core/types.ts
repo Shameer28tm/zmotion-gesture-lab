@@ -68,9 +68,25 @@ export type CameraStatus =
   | 'not_found'
   | 'error';
 
+export interface EngineDiagnostics {
+  inferenceDurationMs: number;
+  inferenceFps: number;
+  cameraFps: number;
+  trackingConfidence: number;
+  handDetected: boolean;
+  activeGesture: GestureType;
+  modelReady: boolean;
+  delegate: 'GPU' | 'CPU';
+  isOfflineFallback: boolean;
+}
+
 export interface GestureEngineConfig {
   sensitivity: number;
   smoothingAlpha: number;
+  adaptiveSmoothing: boolean;
+  maxInferenceFps: number;
+  detectionConfidence: number;
+  trackingConfidence: number;
   pinchThresholdMin: number;
   pinchThresholdMax: number;
   fistCooldownMs: number;
@@ -80,12 +96,16 @@ export interface GestureEngineConfig {
 }
 
 export const DEFAULT_ENGINE_CONFIG: GestureEngineConfig = {
-  sensitivity: 1.2,
-  smoothingAlpha: 0.75, // 0 = raw, 1 = maximum smooth
+  sensitivity: 1.25,
+  smoothingAlpha: 0.55, // Base smoothing for stationary hand
+  adaptiveSmoothing: true, // Dynamically drops alpha during fast motion to eliminate lag
+  maxInferenceFps: 30, // Matches camera frame delivery rate, avoiding redundant inference
+  detectionConfidence: 0.45, // Resilient to rapid hand motion blur
+  trackingConfidence: 0.40,
   pinchThresholdMin: 0.28, // Scaled relative to palmSize
   pinchThresholdMax: 0.65,
   fistCooldownMs: 800,
   pointingThreshold: 1.35,
   pointingCooldownMs: 700,
-  deadZone: 0.04,
+  deadZone: 0.03, // Tighter dead zone for responsive micro-adjustments
 };
