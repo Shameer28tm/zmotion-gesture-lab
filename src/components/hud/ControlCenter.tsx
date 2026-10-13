@@ -191,7 +191,7 @@ export const ControlCenter: React.FC<ControlCenterProps> = ({
             }}
           >
             {gestureState.handDetected
-              ? `LOCKED (${gestureState.handedness})`
+              ? `TRACKING (${gestureState.handedness})`
               : isRunning
               ? 'SEARCHING...'
               : 'OFFLINE / MOUSE'}
@@ -212,7 +212,9 @@ export const ControlCenter: React.FC<ControlCenterProps> = ({
           <span style={{ color: 'var(--text-muted)' }}>DETECTED GESTURE</span>
           <span style={{ color: getGestureColor(), fontWeight: 700, display: 'flex', alignItems: 'center', gap: '4px' }}>
             {gestureState.activeGesture !== 'NONE' && <Sparkles size={11} />}
-            {gestureState.activeGesture}
+            {gestureState.handDetected && gestureState.activeGesture === 'NONE'
+              ? 'NEUTRAL'
+              : gestureState.activeGesture}
           </span>
         </div>
       </div>
@@ -255,7 +257,7 @@ export const ControlCenter: React.FC<ControlCenterProps> = ({
       )}
 
       {/* Real-time Pinch Diagnostics Gauge */}
-      {gestureState.handDetected && (
+      {gestureState.handDetected && gestureState.metrics.pinchStrength > 0.05 && (
         <div
           style={{
             display: 'flex',

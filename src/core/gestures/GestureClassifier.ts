@@ -76,17 +76,23 @@ export class GestureClassifier {
       palmSize
     );
 
+    // Disallow pinch if index finger itself is curled into palm (fist or resting hand on chin)
+    const isIndexCurled = indexCurl > 0.58;
+    const isFist = isIndexCurled && middleCurl > 0.65 && ringCurl > 0.65 && pinkyCurl > 0.65;
+
     let pinchStrength = 0;
-    if (rawPinchDistance <= config.pinchThresholdMin) {
-      pinchStrength = 1.0;
-    } else if (rawPinchDistance >= config.pinchThresholdMax) {
-      pinchStrength = 0.0;
-    } else {
-      const range = config.pinchThresholdMax - config.pinchThresholdMin;
-      pinchStrength = Math.max(
-        0,
-        Math.min(1, 1 - (rawPinchDistance - config.pinchThresholdMin) / range)
-      );
+    if (!isFist && !isIndexCurled) {
+      if (rawPinchDistance <= config.pinchThresholdMin) {
+        pinchStrength = 1.0;
+      } else if (rawPinchDistance >= config.pinchThresholdMax) {
+        pinchStrength = 0.0;
+      } else {
+        const range = config.pinchThresholdMax - config.pinchThresholdMin;
+        pinchStrength = Math.max(
+          0,
+          Math.min(1, 1 - (rawPinchDistance - config.pinchThresholdMin) / range)
+        );
+      }
     }
 
     const confidence = Math.max(0.6, Math.min(0.99, (palmSize / 0.15) * 0.95));
@@ -102,14 +108,8 @@ export class GestureClassifier {
 
     // 3. Gesture State Discrimination
     // A. Closed Fist: all 4 fingers curled
-    const isFist =
-      indexCurl > 0.65 &&
-      middleCurl > 0.65 &&
-      ringCurl > 0.65 &&
-      pinkyCurl > 0.65;
-
-    // B. Pinch Gesture: thumb and index close together, other fingers not curled into fist
-    const isPinching = pinchStrength > 0.65 && !isFist;
+    // B. Pinch Gesture: thumb and index close together, index extended toward thumb
+    const isPinching = pinchStrength > 0.55 && !isFist && !isIndexCurled;
 
     // C. Pointing: index finger extended, middle/ring/pinky curled, not pinching
     const isPointing =
@@ -122,10 +122,10 @@ export class GestureClassifier {
 
     // D. Open Palm: all 4 fingers extended, not pinching
     const isOpenPalm =
-      indexCurl < 0.35 &&
-      middleCurl < 0.35 &&
-      ringCurl < 0.35 &&
-      pinkyCurl < 0.35 &&
+      indexCurl < 0.38 &&
+      middleCurl < 0.38 &&
+      ringCurl < 0.38 &&
+      pinkyCurl < 0.38 &&
       !isPinching &&
       !isFist;
 

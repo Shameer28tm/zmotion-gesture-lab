@@ -21,6 +21,7 @@ import {
   type StudioControlMode,
 } from './StudioSceneController';
 import { CameraBackdrop } from '../../components/camera/CameraBackdrop';
+import { CaptureControls } from '../../components/capture/CaptureControls';
 import '../../styles/hud.css';
 
 export const GestureStudio: React.FC = () => {
@@ -267,6 +268,9 @@ export const GestureStudio: React.FC = () => {
                 </span>
               </div>
             )}
+
+            {/* Privacy-First Capture Controls */}
+            <CaptureControls canvasContainerRef={canvasContainerRef} />
           </div>
         </header>
 

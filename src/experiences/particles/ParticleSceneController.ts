@@ -104,6 +104,7 @@ export class ParticleSceneController {
       this.renderer = new WebGLRenderer({
         antialias: true,
         alpha: true,
+        preserveDrawingBuffer: true,
         powerPreference: 'high-performance',
       });
       this.renderer.setSize(width, height);
@@ -263,15 +264,19 @@ export class ParticleSceneController {
       this.targetRotation.x = rot.rotX * 0.9;
       this.targetRotation.y = rot.rotY * 0.9;
 
-      // 2. Pinch -> Continuous Universe Radial Expansion
-      // Pinched (1.0) -> contracted (0.5x); Spread (0.0) -> expanded (2.2x)
-      const pinchStrength = Math.max(0, Math.min(1, state.metrics.pinchStrength));
-      const targetScale =
-        DEFAULT_PARTICLE_CONFIG.minScale +
-        (1.0 - pinchStrength) * (DEFAULT_PARTICLE_CONFIG.maxScale - DEFAULT_PARTICLE_CONFIG.minScale);
-
-      this.targetExpansion = Number(targetScale.toFixed(2));
-      this.callbacks.onExpansionChange?.(this.targetExpansion);
+      // 2. Continuous Universe Radial Expansion
+      // Pinched (1.0) -> contracted (0.5x); Spread Open Palm (0.0) -> expanded (2.2x)
+      if (state.activeGesture === 'PINCH' || state.activeGesture === 'OPEN_PALM') {
+        const pinchStrength = Math.max(0, Math.min(1, state.metrics.pinchStrength));
+        const targetScale =
+          DEFAULT_PARTICLE_CONFIG.minScale +
+          (1.0 - pinchStrength) * (DEFAULT_PARTICLE_CONFIG.maxScale - DEFAULT_PARTICLE_CONFIG.minScale);
+        this.targetExpansion = Number(targetScale.toFixed(2));
+        this.callbacks.onExpansionChange?.(this.targetExpansion);
+      } else {
+        this.targetExpansion = this.baseExpansion;
+        this.callbacks.onExpansionChange?.(this.baseExpansion);
+      }
     } else {
       // Hand out of frame: ease back towards base expansion
       this.targetExpansion = this.baseExpansion;

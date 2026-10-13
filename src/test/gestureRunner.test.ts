@@ -147,4 +147,23 @@ describe('Gesture Runner Engine (Phase 5)', () => {
     const currentScore = engine.getScore();
     expect(currentScore).toBeGreaterThan(0);
   });
+
+  it('supports EASY, NORMAL, and HARD difficulty settings with correct parameters', () => {
+    const easyEngine = new RunnerEngine('EASY');
+    expect(easyEngine.getDifficulty()).toBe('EASY');
+    expect(easyEngine.getSpeed()).toBe(14);
+
+    const normalEngine = new RunnerEngine('NORMAL');
+    expect(normalEngine.getDifficulty()).toBe('NORMAL');
+    expect(normalEngine.getSpeed()).toBe(19);
+
+    const hardEngine = new RunnerEngine('HARD');
+    expect(hardEngine.getDifficulty()).toBe('HARD');
+    expect(hardEngine.getSpeed()).toBe(25);
+
+    // Switch difficulty at runtime
+    easyEngine.setDifficulty('HARD');
+    expect(easyEngine.getDifficulty()).toBe('HARD');
+    expect(easyEngine.getSpeed()).toBe(25);
+  });
 });

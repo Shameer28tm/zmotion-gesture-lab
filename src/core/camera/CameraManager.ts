@@ -43,6 +43,12 @@ export class CameraManager {
       if (this.videoElement.parentElement !== container) {
         container.appendChild(this.videoElement);
       }
+      // Guarantee video continues playing across route transitions
+      if (this.videoElement.paused) {
+        this.videoElement.play().catch((err) => {
+          console.warn('Video resume on attach failed:', err);
+        });
+      }
     }
   }
 
@@ -56,6 +62,12 @@ export class CameraManager {
         }
       }
       this.attachedContainer = null;
+    }
+  }
+
+  public ensureActivePlayback(): void {
+    if (this.videoElement && this.isActive() && this.videoElement.paused) {
+      this.videoElement.play().catch(() => {});
     }
   }
 

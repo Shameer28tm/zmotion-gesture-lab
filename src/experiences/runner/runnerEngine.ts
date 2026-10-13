@@ -27,6 +27,8 @@ export interface PlayerState {
   tilt: number; // Banking angle when changing lanes
 }
 
+export type RunnerDifficulty = 'EASY' | 'NORMAL' | 'HARD';
+
 export interface RunnerConfig {
   initialSpeed: number;
   maxSpeed: number;
@@ -39,22 +41,49 @@ export interface RunnerConfig {
   minObstacleSpacing: number;
 }
 
-export const DEFAULT_RUNNER_CONFIG: RunnerConfig = {
-  initialSpeed: 22.0,
-  maxSpeed: 45.0,
-  speedAcceleration: 0.35, // Speed units gained per 100 meters
-  laneDistance: 2.2, // Distance between lane centers
-  gravity: 38.0, // Snappy arcade gravity
-  jumpVelocity: 14.5,
-  playerCollisionRadius: 0.65,
-  spawnDistance: 70.0,
-  minObstacleSpacing: 14.0,
+export const DIFFICULTY_CONFIGS: Record<RunnerDifficulty, RunnerConfig> = {
+  EASY: {
+    initialSpeed: 14.0,
+    maxSpeed: 25.0,
+    speedAcceleration: 0.15,
+    laneDistance: 2.2,
+    gravity: 28.0, // Forgiving floaty jump
+    jumpVelocity: 13.0,
+    playerCollisionRadius: 0.45, // Generous collision boundary
+    spawnDistance: 75.0,
+    minObstacleSpacing: 26.0, // Long reaction interval
+  },
+  NORMAL: {
+    initialSpeed: 19.0,
+    maxSpeed: 36.0,
+    speedAcceleration: 0.28,
+    laneDistance: 2.2,
+    gravity: 34.0,
+    jumpVelocity: 14.0,
+    playerCollisionRadius: 0.55,
+    spawnDistance: 70.0,
+    minObstacleSpacing: 19.0,
+  },
+  HARD: {
+    initialSpeed: 25.0,
+    maxSpeed: 46.0,
+    speedAcceleration: 0.40,
+    laneDistance: 2.2,
+    gravity: 40.0,
+    jumpVelocity: 15.0,
+    playerCollisionRadius: 0.65,
+    spawnDistance: 65.0,
+    minObstacleSpacing: 14.0,
+  },
 };
+
+export const DEFAULT_RUNNER_CONFIG: RunnerConfig = DIFFICULTY_CONFIGS.EASY;
 
 const HIGH_SCORE_KEY = 'zmotion_runner_high_score';
 
 export class RunnerEngine {
   private config: RunnerConfig;
+  private difficulty: RunnerDifficulty = 'EASY';
   private state: RunnerGameState = 'IDLE';
 
   private player: PlayerState;
@@ -67,8 +96,17 @@ export class RunnerEngine {
   private highScore: number = 0;
   private multiplier: number = 1.0;
 
-  constructor(config: Partial<RunnerConfig> = {}) {
-    this.config = { ...DEFAULT_RUNNER_CONFIG, ...config };
+  constructor(configOrDifficulty?: RunnerDifficulty | Partial<RunnerConfig>) {
+    if (typeof configOrDifficulty === 'string') {
+      this.difficulty = configOrDifficulty;
+      this.config = { ...DIFFICULTY_CONFIGS[configOrDifficulty] };
+    } else if (typeof configOrDifficulty === 'object' && configOrDifficulty !== null) {
+      this.difficulty = 'NORMAL';
+      this.config = { ...DIFFICULTY_CONFIGS.NORMAL, ...configOrDifficulty };
+    } else {
+      this.difficulty = 'EASY';
+      this.config = { ...DIFFICULTY_CONFIGS.EASY };
+    }
     this.speed = this.config.initialSpeed;
 
     this.player = {
@@ -82,6 +120,18 @@ export class RunnerEngine {
     };
 
     this.highScore = this.loadHighScore();
+  }
+
+  public setDifficulty(difficulty: RunnerDifficulty): void {
+    this.difficulty = difficulty;
+    this.config = { ...DIFFICULTY_CONFIGS[difficulty] };
+    if (this.state === 'IDLE' || this.state === 'GAME_OVER') {
+      this.speed = this.config.initialSpeed;
+    }
+  }
+
+  public getDifficulty(): RunnerDifficulty {
+    return this.difficulty;
   }
 
   public getState(): RunnerGameState {

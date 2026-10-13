@@ -121,12 +121,14 @@ export const AppContent: React.FC = () => {
       {/* Background Cyber Grid Accent */}
       <div className="cyber-grid-overlay" />
 
-      {/* Persistent Navigation */}
-      <Navbar
-        currentRoute={currentRoute}
-        onRouteChange={handleNavigate}
-        onOpenOnboarding={() => setIsOnboardingOpen(true)}
-      />
+      {/* Persistent Navigation (Hidden on minimal landing page, visible on experiences) */}
+      {currentRoute !== 'home' && (
+        <Navbar
+          currentRoute={currentRoute}
+          onRouteChange={handleNavigate}
+          onOpenOnboarding={() => setIsOnboardingOpen(true)}
+        />
+      )}
 
       {/* Main Experience Viewport */}
       <main style={{ flex: 1, display: 'flex', flexDirection: 'column', position: 'relative', zIndex: 1 }}>

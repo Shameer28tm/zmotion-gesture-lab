@@ -15,24 +15,28 @@ import { Button } from '../../components/ui/Button';
 import { Card } from '../../components/ui/Card';
 import { Badge } from '../../components/ui/Badge';
 import { useGestureEngine } from '../../core/engine/GestureContext';
-import { RunnerEngine, type RunnerGameState } from './runnerEngine';
+import { RunnerEngine, type RunnerGameState, type RunnerDifficulty } from './runnerEngine';
 import { RunnerSceneController } from './RunnerSceneController';
 import { CameraBackdrop } from '../../components/camera/CameraBackdrop';
+import { CaptureControls } from '../../components/capture/CaptureControls';
 import '../../styles/hud.css';
 
 export const GestureRunner: React.FC = () => {
   const canvasContainerRef = useRef<HTMLDivElement | null>(null);
   const controllerRef = useRef<RunnerSceneController | null>(null);
-  const engineRef = useRef<RunnerEngine>(new RunnerEngine());
+  const engineRef = useRef<RunnerEngine>(new RunnerEngine('EASY'));
 
   const { engine: gestureEngine, gestureState, isRunning } = useGestureEngine();
 
   // Low-frequency UI reactive state
   const [gameState, setGameState] = useState<RunnerGameState>('IDLE');
+  const [difficulty, setDifficulty] = useState<RunnerDifficulty>('EASY');
+  const [playerLane, setPlayerLane] = useState<'LEFT' | 'CENTER' | 'RIGHT'>('CENTER');
+  const [hasCollisionFlash, setHasCollisionFlash] = useState(false);
   const [score, setScore] = useState(0);
   const [distance, setDistance] = useState(0);
   const [highScore, setHighScore] = useState(0);
-  const [speed, setSpeed] = useState(22);
+  const [speed, setSpeed] = useState(14);
   const [multiplier, setMultiplier] = useState(1.0);
   const [isNewRecord, setIsNewRecord] = useState(false);
 
@@ -59,6 +63,8 @@ export const GestureRunner: React.FC = () => {
       const result = gameEngine.update(dt);
       if (result.collision) {
         controller.triggerExplosion();
+        setHasCollisionFlash(true);
+        setTimeout(() => setHasCollisionFlash(false), 450);
       }
 
       // Sync 3D scene visual representations
@@ -70,9 +76,11 @@ export const GestureRunner: React.FC = () => {
         setGameState(gameEngine.getState());
         setScore(gameEngine.getScore());
         setDistance(gameEngine.getDistance());
-        setSpeed(gameEngine.getSpeed());
+        setSpeed(Math.round(gameEngine.getSpeed()));
         setMultiplier(gameEngine.getMultiplier());
         setHighScore(gameEngine.getHighScore());
+        const laneVal = gameEngine.getPlayer().lane;
+        setPlayerLane(laneVal === -1 ? 'LEFT' : laneVal === 1 ? 'RIGHT' : 'CENTER');
       }
 
       animId = requestAnimationFrame(gameLoop);
@@ -80,17 +88,29 @@ export const GestureRunner: React.FC = () => {
 
     animId = requestAnimationFrame(gameLoop);
 
-    // High-frequency gesture listener for horizontal steering
+    let isFistCurrentlyLatched = false;
+
+    // High-frequency gesture listener for horizontal steering and fist unlatching
     const unsubFrame = gestureEngine.onFrame((state) => {
-      if (state.handDetected && gameEngine.getState() === 'PLAYING') {
-        gameEngine.setNormalizedHandX(state.metrics.handCenter.x);
+      if (gameEngine.getState() === 'PLAYING') {
+        if (state.handDetected) {
+          gameEngine.setNormalizedHandX(state.metrics.handCenter.x);
+          if (state.activeGesture !== 'CLOSED_FIST') {
+            isFistCurrentlyLatched = false;
+          }
+        } else {
+          isFistCurrentlyLatched = false;
+        }
       }
     });
 
-    // Discrete fist gesture listener for jumping
+    // Discrete fist gesture listener with latching (1 jump per clench)
     const unsubFist = gestureEngine.onFistTrigger(() => {
-      if (gameEngine.getState() === 'PLAYING') {
-        gameEngine.jump();
+      if (gameEngine.getState() === 'PLAYING' && !isFistCurrentlyLatched) {
+        const jumped = gameEngine.jump();
+        if (jumped) {
+          isFistCurrentlyLatched = true;
+        }
       }
     });
 
@@ -102,6 +122,11 @@ export const GestureRunner: React.FC = () => {
       controllerRef.current = null;
     };
   }, [gestureEngine]);
+
+  const handleSelectDifficulty = useCallback((diff: RunnerDifficulty) => {
+    setDifficulty(diff);
+    engineRef.current.setDifficulty(diff);
+  }, []);
 
   // Handle Start / Restart
   const handleStartGame = useCallback(() => {
@@ -249,7 +274,7 @@ export const GestureRunner: React.FC = () => {
             </span>
           </div>
 
-          <div className="hud-telemetry-cluster">
+          <div className="hud-telemetry-cluster" style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
             {/* Live Score */}
             <div className="telemetry-card">
               <span className="telemetry-label">SCORE</span>
@@ -272,6 +297,25 @@ export const GestureRunner: React.FC = () => {
               </span>
             </div>
 
+            {/* Active Lane */}
+            <div className="telemetry-card">
+              <span className="telemetry-label">LANE</span>
+              <span
+                className="telemetry-value"
+                style={{ color: playerLane === 'CENTER' ? 'var(--electric-cyan)' : '#00f5d4' }}
+              >
+                {playerLane}
+              </span>
+            </div>
+
+            {/* Difficulty Badge */}
+            <div className="telemetry-card">
+              <span className="telemetry-label">DIFFICULTY</span>
+              <span className="telemetry-value" style={{ fontSize: '12px' }}>
+                {difficulty}
+              </span>
+            </div>
+
             {/* Speed & Multiplier */}
             <div className="telemetry-card">
               <span className="telemetry-label">SPEED</span>
@@ -282,8 +326,26 @@ export const GestureRunner: React.FC = () => {
               <span className="telemetry-label">MULTIPLIER</span>
               <span className="telemetry-value">{multiplier}x</span>
             </div>
+
+            {/* Privacy-First In-Memory Photo & Video Capture */}
+            <CaptureControls canvasContainerRef={canvasContainerRef} />
           </div>
         </header>
+
+        {/* Red Impact Collision Flash */}
+        {hasCollisionFlash && (
+          <div
+            style={{
+              position: 'absolute',
+              inset: 0,
+              pointerEvents: 'none',
+              border: '4px solid rgba(255, 51, 102, 0.85)',
+              backgroundColor: 'rgba(255, 51, 102, 0.18)',
+              zIndex: 35,
+              transition: 'opacity 0.2s ease',
+            }}
+          />
+        )}
 
         {/* Center Game State Overlays */}
         {gameState === 'IDLE' && (
@@ -294,8 +356,8 @@ export const GestureRunner: React.FC = () => {
               left: '50%',
               transform: 'translate(-50%, -50%)',
               zIndex: 10,
-              maxWidth: '420px',
-              width: '90%',
+              maxWidth: '460px',
+              width: '92%',
             }}
           >
             <Card
@@ -306,8 +368,8 @@ export const GestureRunner: React.FC = () => {
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                gap: '16px',
-                background: 'rgba(8, 13, 26, 0.9)',
+                gap: '14px',
+                background: 'rgba(8, 13, 26, 0.95)',
                 backdropFilter: 'blur(20px)',
                 border: '1px solid var(--border-glass)',
                 boxShadow: '0 20px 50px rgba(0, 0, 0, 0.8)',
@@ -315,8 +377,8 @@ export const GestureRunner: React.FC = () => {
             >
               <div
                 style={{
-                  width: '56px',
-                  height: '56px',
+                  width: '54px',
+                  height: '54px',
                   borderRadius: '14px',
                   background: 'rgba(0, 210, 255, 0.1)',
                   border: '1px solid rgba(0, 210, 255, 0.3)',
@@ -326,7 +388,7 @@ export const GestureRunner: React.FC = () => {
                   boxShadow: '0 0 30px rgba(0, 210, 255, 0.25)',
                 }}
               >
-                <Gamepad2 size={32} color="var(--electric-blue)" />
+                <Gamepad2 size={30} color="var(--electric-blue)" />
               </div>
 
               <div>
@@ -334,11 +396,41 @@ export const GestureRunner: React.FC = () => {
                   ENDLESS CYBER RUNNER
                 </h2>
                 <p style={{ margin: 0, fontSize: '13px', color: 'var(--text-secondary)' }}>
-                  Steer left/right and jump over high-voltage barriers in real time.
+                  Vision-driven 3D obstacle runway. Dodge hazards, collect energy, and survive!
                 </p>
               </div>
 
-              {/* Instructions Summary */}
+              {/* Difficulty Mode Selector */}
+              <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '6px', textAlign: 'left' }}>
+                <span style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', color: 'var(--text-muted)' }}>
+                  DIFFICULTY (EASY IS RECOMMENDED):
+                </span>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '6px' }}>
+                  {(['EASY', 'NORMAL', 'HARD'] as RunnerDifficulty[]).map((d) => (
+                    <button
+                      key={d}
+                      type="button"
+                      onClick={() => handleSelectDifficulty(d)}
+                      style={{
+                        padding: '8px 4px',
+                        borderRadius: '6px',
+                        border: difficulty === d ? '1px solid var(--electric-cyan)' : '1px solid var(--border-subtle)',
+                        background: difficulty === d ? 'rgba(0, 210, 255, 0.18)' : 'rgba(0, 0, 0, 0.3)',
+                        color: difficulty === d ? '#fff' : 'var(--text-muted)',
+                        fontFamily: 'var(--font-mono)',
+                        fontSize: '11px',
+                        fontWeight: difficulty === d ? 700 : 500,
+                        cursor: 'pointer',
+                        transition: 'all 0.2s ease',
+                      }}
+                    >
+                      {d} {d === 'EASY' && '★'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Visual Onboarding Controls Mapping */}
               <div
                 style={{
                   width: '100%',
@@ -355,12 +447,22 @@ export const GestureRunner: React.FC = () => {
                 }}
               >
                 <div>
-                  <span style={{ color: 'var(--electric-cyan)', fontWeight: 700 }}>HAND LEFT/RIGHT:</span>
-                  <div style={{ color: 'var(--text-muted)' }}>Change Lanes (A / D)</div>
+                  <span style={{ color: 'var(--electric-cyan)', fontWeight: 700 }}>STEER:</span>
+                  <div style={{ color: 'var(--text-secondary)' }}>Move Hand Left / Right</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '10px' }}>Keys: A / D or ← / →</div>
                 </div>
                 <div>
-                  <span style={{ color: '#ffaa00', fontWeight: 700 }}>CLOSED FIST:</span>
-                  <div style={{ color: 'var(--text-muted)' }}>Jump Barrier (Space)</div>
+                  <span style={{ color: '#00f5d4', fontWeight: 700 }}>JUMP:</span>
+                  <div style={{ color: 'var(--text-secondary)' }}>Clench Closed Fist</div>
+                  <div style={{ color: 'var(--text-muted)', fontSize: '10px' }}>Key: Space or Up</div>
+                </div>
+                <div>
+                  <span style={{ color: '#ffaa00', fontWeight: 700 }}>OBJECTIVE:</span>
+                  <div style={{ color: 'var(--text-secondary)' }}>Dodge Red Barriers</div>
+                </div>
+                <div>
+                  <span style={{ color: '#ff00aa', fontWeight: 700 }}>FALLBACK:</span>
+                  <div style={{ color: 'var(--text-secondary)' }}>On-Screen Buttons & Keys</div>
                 </div>
               </div>
 
@@ -386,7 +488,7 @@ export const GestureRunner: React.FC = () => {
               left: '50%',
               transform: 'translate(-50%, -50%)',
               zIndex: 10,
-              maxWidth: '380px',
+              maxWidth: '400px',
               width: '90%',
             }}
           >
@@ -398,7 +500,7 @@ export const GestureRunner: React.FC = () => {
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
-                gap: '16px',
+                gap: '14px',
                 background: 'rgba(8, 13, 26, 0.95)',
                 backdropFilter: 'blur(20px)',
                 border: '1px solid rgba(255, 51, 102, 0.4)',
@@ -460,6 +562,29 @@ export const GestureRunner: React.FC = () => {
                     {distance.toLocaleString()}m
                   </div>
                 </div>
+              </div>
+
+              {/* Quick Difficulty Switcher on Game Over */}
+              <div style={{ width: '100%', display: 'flex', justifyContent: 'center', gap: '6px' }}>
+                {(['EASY', 'NORMAL', 'HARD'] as RunnerDifficulty[]).map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => handleSelectDifficulty(d)}
+                    style={{
+                      padding: '4px 8px',
+                      borderRadius: '4px',
+                      border: difficulty === d ? '1px solid var(--electric-cyan)' : '1px solid var(--border-subtle)',
+                      background: difficulty === d ? 'rgba(0, 210, 255, 0.15)' : 'rgba(0, 0, 0, 0.3)',
+                      color: difficulty === d ? '#fff' : 'var(--text-muted)',
+                      fontFamily: 'var(--font-mono)',
+                      fontSize: '10px',
+                      cursor: 'pointer',
+                    }}
+                  >
+                    {d}
+                  </button>
+                ))}
               </div>
 
               {isNewRecord && (

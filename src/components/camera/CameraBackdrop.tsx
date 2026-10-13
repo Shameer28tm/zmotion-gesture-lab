@@ -14,6 +14,7 @@ export const CameraBackdrop: React.FC<CameraBackdropProps> = ({ className = '', 
     if (!containerRef.current) return;
     const container = containerRef.current;
     engine.attachCameraToContainer(container);
+    engine.resetTrackingState();
 
     return () => {
       engine.detachCameraFromContainer(container);

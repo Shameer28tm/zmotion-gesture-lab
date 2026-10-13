@@ -26,6 +26,7 @@ import {
   DEFAULT_PARTICLE_CONFIG,
 } from './particleMath';
 import { CameraBackdrop } from '../../components/camera/CameraBackdrop';
+import { CaptureControls } from '../../components/capture/CaptureControls';
 import '../../styles/hud.css';
 
 export const ParticleUniverse: React.FC = () => {
@@ -268,6 +269,9 @@ export const ParticleUniverse: React.FC = () => {
               <span className="telemetry-label">EXPANSION</span>
               <span className="telemetry-value">{expansion.toFixed(2)}x</span>
             </div>
+
+            {/* Privacy-First Capture Controls */}
+            <CaptureControls canvasContainerRef={canvasContainerRef} />
           </div>
         </header>
 

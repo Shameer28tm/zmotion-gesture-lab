@@ -45,6 +45,9 @@ export class GestureEngine {
 
   // Inference optimization & telemetry tracking
   private lastInferenceTime = 0;
+  private lastInferenceTimestamp = 0;
+  private lastValidHandTime = 0;
+  private smoothedLatency = 0;
   private lastVideoTime = -1;
   private lastRawLandmarks: HandLandmarks | null = null;
   private inferenceFrameCount = 0;
@@ -222,6 +225,23 @@ export class GestureEngine {
     this.notifyStateChange();
   }
 
+  public resetTrackingState(): void {
+    this.smoother.reset();
+    this.currentState = {
+      activeGesture: 'NONE',
+      metrics: GestureClassifier.createEmptyMetrics(),
+      handDetected: false,
+      handedness: 'Unknown',
+    };
+    this.lastRawLandmarks = null;
+    this.lastValidHandTime = 0;
+    this.previousReportedGesture = 'NONE';
+    this.previousHandDetected = false;
+    this.diagnostics.handDetected = false;
+    this.diagnostics.activeGesture = 'NONE';
+    this.notifyStateChange();
+  }
+
   /**
    * High-Performance Process Loop:
    * Throttles inference to match video frame availability (~30 FPS),
@@ -232,6 +252,11 @@ export class GestureEngine {
 
     const video = this.cameraManager.getVideoElement();
     if (video && video.readyState >= 2) {
+      // Auto-resume video if browser paused it during a DOM transition
+      if (video.paused) {
+        this.cameraManager.ensureActivePlayback();
+      }
+
       const minInterval = 1000 / (this.config.maxInferenceFps || 30);
       const isNewFrame = video.currentTime !== this.lastVideoTime;
       const elapsedSinceInference = now - this.lastInferenceTime;
@@ -239,9 +264,23 @@ export class GestureEngine {
       // Only execute heavy MediaPipe inference when a fresh video frame has arrived
       // and minimum interval has elapsed
       if (isNewFrame && elapsedSinceInference >= minInterval) {
+        // Guarantee strictly monotonic timestamp for MediaPipe Tasks Vision
+        const safeTimestamp = Math.max(now, this.lastInferenceTimestamp + 1);
+        this.lastInferenceTimestamp = safeTimestamp;
+
         const infStart = performance.now();
-        const result = this.landmarkerService.detectForVideo(video, now);
-        const infDuration = performance.now() - infStart;
+        const result = this.landmarkerService.detectForVideo(video, safeTimestamp);
+        const rawInfDuration = performance.now() - infStart;
+
+        // Discard initial shader compilation spikes (> 300ms) to ensure accurate steady-state reporting
+        const validDuration =
+          rawInfDuration > 0 && rawInfDuration < 300
+            ? rawInfDuration
+            : this.smoothedLatency || 22;
+        this.smoothedLatency =
+          this.smoothedLatency > 0
+            ? Math.round(this.smoothedLatency * 0.7 + validDuration * 0.3)
+            : Math.round(validDuration);
 
         this.lastVideoTime = video.currentTime;
         this.lastInferenceTime = now;
@@ -257,6 +296,7 @@ export class GestureEngine {
         }
 
         if (result && result.landmarks && result.landmarks.length > 0) {
+          this.lastValidHandTime = now;
           const rawLandmarks = result.landmarks[0] as HandLandmarks;
           this.lastRawLandmarks = rawLandmarks;
           const handedness =
@@ -283,7 +323,7 @@ export class GestureEngine {
 
           // Update diagnostics
           this.diagnostics = {
-            inferenceDurationMs: Math.round(infDuration),
+            inferenceDurationMs: this.smoothedLatency,
             inferenceFps: this.currentInferenceFps || 30,
             cameraFps: 30,
             trackingConfidence: Number((smoothedMetrics.confidence || 0.95).toFixed(2)),
@@ -332,7 +372,7 @@ export class GestureEngine {
           };
 
           this.diagnostics = {
-            inferenceDurationMs: Math.round(infDuration),
+            inferenceDurationMs: this.smoothedLatency,
             inferenceFps: this.currentInferenceFps || 30,
             cameraFps: 30,
             trackingConfidence: 0,
@@ -365,6 +405,22 @@ export class GestureEngine {
             }
           });
         }
+      }
+
+      // Hand presence watchdog: clear locked hand state if no frames arrived for > 280ms
+      if (this.currentState.handDetected && now - this.lastValidHandTime > 280) {
+        this.currentState = {
+          activeGesture: 'NONE',
+          metrics: GestureClassifier.createEmptyMetrics(),
+          handDetected: false,
+          handedness: 'Unknown',
+        };
+        this.lastRawLandmarks = null;
+        this.diagnostics.handDetected = false;
+        this.diagnostics.activeGesture = 'NONE';
+        this.previousReportedGesture = 'NONE';
+        this.previousHandDetected = false;
+        this.notifyStateChange();
       }
 
       // Always deliver smoothed 3D frame updates to renderers on every RAF tick

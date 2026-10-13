@@ -8,24 +8,28 @@ describe('ZMotion Foundation Tests', () => {
     window.scrollTo = () => {};
   });
 
-  it('renders the header with ZMotion branding and status badge', () => {
+  it('renders the experience header with ZMotion branding and status badge', async () => {
     render(<App />);
-    expect(screen.getByText('ZMOTION')).toBeDefined();
-    expect(screen.getByText('GESTURE LAB')).toBeDefined();
-    expect(screen.getByText('VISION ENGINE')).toBeDefined();
+    const particlesBtn = screen.getAllByText('Launch Particle Universe')[0];
+    fireEvent.click(particlesBtn);
+    expect(await screen.findByText('ZMOTION')).toBeDefined();
+    expect(await screen.findByText('GESTURE LAB')).toBeDefined();
+    expect(await screen.findByText('VISION ENGINE')).toBeDefined();
   });
 
-  it('renders home hero section and calls to action', () => {
+  it('renders redesigned minimalist home hero section and experience cards', () => {
     render(<App />);
-    expect(screen.getByText(/Touchless Interaction in/i)).toBeDefined();
+    expect(screen.getByText(/Real-Time Hand Gesture Control in 3D/i)).toBeDefined();
+    expect(screen.getByText('100% USER-SIDE PRIVACY')).toBeDefined();
+    expect(screen.getByText('Leverage Early. Move Differently. Sky Is the Limit.')).toBeDefined();
     expect(screen.getAllByText('Launch Particle Universe').length).toBeGreaterThan(0);
-    expect(screen.getAllByText('Open 3D Gesture Studio').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Open Gesture Studio').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Play Cyber Runner').length).toBeGreaterThan(0);
   });
 
   it('navigates to Gesture Studio when clicking studio action', async () => {
     render(<App />);
-    const studioBtn = screen.getAllByText('Open 3D Gesture Studio')[0];
+    const studioBtn = screen.getAllByText('Open Gesture Studio')[0];
     fireEvent.click(studioBtn);
     expect(await screen.findByText('GESTURE STUDIO')).toBeDefined();
     expect(await screen.findByText('SHAPE PRESETS')).toBeDefined();
@@ -47,9 +51,11 @@ describe('ZMotion Foundation Tests', () => {
     expect(await screen.findByText(/INPUT CONTROLLER/i)).toBeDefined();
   });
 
-  it('opens and closes the onboarding modal when Controls button is clicked', () => {
+  it('opens and closes the onboarding modal when Controls button is clicked in an experience', async () => {
     render(<App />);
-    const controlsBtn = screen.getByText('Controls');
+    const particlesBtn = screen.getAllByText('Launch Particle Universe')[0];
+    fireEvent.click(particlesBtn);
+    const controlsBtn = await screen.findByText('Controls');
     fireEvent.click(controlsBtn);
     expect(screen.getByText('ZMotion Gesture Lab — Controls & Calibration')).toBeDefined();
 

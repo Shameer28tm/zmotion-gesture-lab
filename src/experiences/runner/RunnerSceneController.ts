@@ -77,6 +77,7 @@ export class RunnerSceneController {
       this.renderer = new WebGLRenderer({
         antialias: true,
         alpha: true,
+        preserveDrawingBuffer: true,
         powerPreference: 'high-performance',
       });
       this.renderer.setSize(width, height);

@@ -1,0 +1,219 @@
+/* ===================================================================
+   ZMOTION — COSMIC SPACE BACKGROUND (2D CSS Lightweight Visual)
+   Inspiration: Deep space, layered starfields, subtle moons & orbital paths
+   Zero WebGL, Zero heavy libraries, 100% accessible & performant
+   =================================================================== */
+
+.cosmic-space-canvas {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  z-index: 0;
+  background: 
+    radial-gradient(circle at 50% 15%, rgba(0, 210, 255, 0.07) 0%, transparent 55%),
+    radial-gradient(circle at 85% 75%, rgba(14, 22, 60, 0.5) 0%, transparent 60%),
+    linear-gradient(180deg, #04060a 0%, #060b18 50%, #04060a 100%);
+}
+
+/* Layered Starfield 1: Distant micro-stars */
+.cosmic-stars-distant {
+  position: absolute;
+  inset: -100px;
+  background-image:
+    radial-gradient(1px 1px at 45px 80px, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1px 1px at 120px 220px, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(1px 1px at 280px 140px, rgba(0, 210, 255, 0.7), transparent),
+    radial-gradient(1.5px 1.5px at 390px 450px, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(1px 1px at 520px 90px, rgba(255, 255, 255, 0.4), transparent),
+    radial-gradient(1px 1px at 660px 310px, rgba(0, 245, 212, 0.6), transparent),
+    radial-gradient(1.5px 1.5px at 780px 180px, rgba(255, 255, 255, 0.7), transparent),
+    radial-gradient(1px 1px at 910px 420px, rgba(255, 255, 255, 0.5), transparent),
+    radial-gradient(1px 1px at 1040px 130px, rgba(0, 210, 255, 0.6), transparent),
+    radial-gradient(1.5px 1.5px at 1180px 380px, rgba(255, 255, 255, 0.8), transparent),
+    radial-gradient(1px 1px at 1310px 240px, rgba(255, 255, 255, 0.4), transparent),
+    radial-gradient(1px 1px at 1450px 90px, rgba(0, 245, 212, 0.7), transparent);
+  background-size: 700px 500px;
+  opacity: 0.65;
+  animation: cosmicDriftSlow 120s linear infinite;
+}
+
+/* Layered Starfield 2: Bright sparkling nodes */
+.cosmic-stars-bright {
+  position: absolute;
+  inset: -100px;
+  background-image:
+    radial-gradient(2px 2px at 90px 160px, rgba(255, 255, 255, 0.9), transparent),
+    radial-gradient(2px 2px at 340px 320px, rgba(0, 210, 255, 0.95), transparent),
+    radial-gradient(2px 2px at 710px 95px, rgba(255, 255, 255, 0.85), transparent),
+    radial-gradient(2.5px 2.5px at 1020px 290px, rgba(0, 245, 212, 0.9), transparent),
+    radial-gradient(2px 2px at 1380px 190px, rgba(255, 255, 255, 0.9), transparent);
+  background-size: 850px 600px;
+  opacity: 0.8;
+  animation: cosmicTwinkle 6s ease-in-out infinite alternate;
+}
+
+/* Distant Sapphire Planet */
+.cosmic-planet-primary {
+  position: absolute;
+  top: 14%;
+  right: 12%;
+  width: 72px;
+  height: 72px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #00d2ff 0%, #0a2540 60%, #030a14 100%);
+  box-shadow: 
+    0 0 35px rgba(0, 210, 255, 0.25),
+    inset -8px -8px 16px rgba(0, 0, 0, 0.8);
+  opacity: 0.85;
+  animation: cosmicPlanetFloat 24s ease-in-out infinite alternate;
+}
+
+/* Subtle Planet Ring */
+.cosmic-planet-ring {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 120px;
+  height: 32px;
+  margin-top: -16px;
+  margin-left: -60px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(0, 210, 255, 0.3);
+  transform: rotate(-25deg);
+  pointer-events: none;
+  box-shadow: 0 0 8px rgba(0, 210, 255, 0.2);
+}
+
+/* Distant Small Moon */
+.cosmic-moon {
+  position: absolute;
+  top: 26%;
+  left: 10%;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 40% 35%, #94a3b8 0%, #1e293b 70%, #070d18 100%);
+  box-shadow: 0 0 16px rgba(148, 163, 184, 0.2);
+  opacity: 0.7;
+  animation: cosmicPlanetFloat 32s ease-in-out infinite alternate-reverse;
+}
+
+/* Orbital Path Ellipse (SVG background) */
+.cosmic-orbit-svg {
+  position: absolute;
+  top: 5%;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 1100px;
+  height: 600px;
+  opacity: 0.35;
+  pointer-events: none;
+}
+
+/* Shooting Star Streak */
+.cosmic-shooting-star {
+  position: absolute;
+  top: 18%;
+  left: 20%;
+  width: 140px;
+  height: 1.5px;
+  background: linear-gradient(90deg, rgba(0, 245, 212, 0.85), rgba(0, 210, 255, 0.4), transparent);
+  border-radius: 999px;
+  transform: rotate(-35deg);
+  opacity: 0;
+  animation: cosmicShootingStar 9s ease-in-out infinite;
+}
+
+/* Animations */
+@keyframes cosmicDriftSlow {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-120px, -60px, 0);
+  }
+}
+
+@keyframes cosmicTwinkle {
+  0% {
+    opacity: 0.45;
+  }
+  50% {
+    opacity: 0.85;
+  }
+  100% {
+    opacity: 0.55;
+  }
+}
+
+@keyframes cosmicPlanetFloat {
+  0% {
+    transform: translate3d(0, 0, 0);
+  }
+  100% {
+    transform: translate3d(-14px, 12px, 0);
+  }
+}
+
+@keyframes cosmicShootingStar {
+  0%, 75% {
+    opacity: 0;
+    transform: translate3d(0, 0, 0) rotate(-35deg) scaleX(0.2);
+  }
+  78% {
+    opacity: 1;
+    transform: translate3d(80px, 80px, 0) rotate(-35deg) scaleX(1);
+  }
+  82% {
+    opacity: 0;
+    transform: translate3d(240px, 240px, 0) rotate(-35deg) scaleX(0.3);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(240px, 240px, 0) rotate(-35deg) scaleX(0);
+  }
+}
+
+/* Accessibility: Respect Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .cosmic-stars-distant,
+  .cosmic-stars-bright,
+  .cosmic-planet-primary,
+  .cosmic-moon,
+  .cosmic-shooting-star {
+    animation: none !important;
+    transform: none !important;
+  }
+  .cosmic-shooting-star {
+    display: none !important;
+  }
+}
+
+/* Mobile Optimizations */
+@media (max-width: 768px) {
+  .cosmic-planet-primary {
+    width: 44px;
+    height: 44px;
+    top: 8%;
+    right: 6%;
+    box-shadow: 0 0 18px rgba(0, 210, 255, 0.2);
+  }
+  .cosmic-planet-ring {
+    width: 74px;
+    height: 20px;
+    margin-top: -10px;
+    margin-left: -37px;
+  }
+  .cosmic-moon {
+    width: 18px;
+    height: 18px;
+    top: 18%;
+    left: 6%;
+  }
+  .cosmic-orbit-svg {
+    width: 600px;
+    height: 350px;
+    opacity: 0.25;
+  }
+}
