@@ -8,6 +8,7 @@ export class CameraManager {
   private status: CameraStatus = 'idle';
   private listeners: Set<CameraStatusListener> = new Set();
   private lastErrorMessage: string | null = null;
+  private attachedContainer: HTMLElement | null = null;
 
   constructor() {
     this.handleVisibilityChange = this.handleVisibilityChange.bind(this);
@@ -28,8 +29,34 @@ export class CameraManager {
     return this.videoElement;
   }
 
+  public getStream(): MediaStream | null {
+    return this.stream;
+  }
+
   public isActive(): boolean {
     return this.status === 'streaming' && !!this.stream && this.stream.active;
+  }
+
+  public attachToContainer(container: HTMLElement): void {
+    this.attachedContainer = container;
+    if (this.videoElement && container) {
+      if (this.videoElement.parentElement !== container) {
+        container.appendChild(this.videoElement);
+      }
+    }
+  }
+
+  public detachFromContainer(container?: HTMLElement): void {
+    if (!container || this.attachedContainer === container) {
+      if (this.videoElement && this.videoElement.parentElement) {
+        try {
+          this.videoElement.parentElement.removeChild(this.videoElement);
+        } catch {
+          // Ignore if already detached
+        }
+      }
+      this.attachedContainer = null;
+    }
   }
 
   public onStatusChange(listener: CameraStatusListener): () => void {
@@ -60,15 +87,17 @@ export class CameraManager {
     this.setStatus('requesting');
 
     try {
-      // Create offscreen video element if not provided
+      // Create video element if not provided
       if (!this.videoElement) {
         this.videoElement = customVideoElement ?? document.createElement('video');
+        this.videoElement.className = 'live-camera-feed';
         this.videoElement.setAttribute('playsinline', 'true');
         this.videoElement.setAttribute('autoplay', 'true');
         this.videoElement.muted = true;
       } else if (customVideoElement && this.videoElement !== customVideoElement) {
         this.videoElement = customVideoElement;
       }
+      this.videoElement.className = 'live-camera-feed';
 
       const constraints: MediaStreamConstraints = {
         video: {
@@ -83,6 +112,11 @@ export class CameraManager {
       const stream = await navigator.mediaDevices.getUserMedia(constraints);
       this.stream = stream;
       this.videoElement.srcObject = stream;
+
+      // Attach to active container if registered
+      if (this.attachedContainer && this.videoElement.parentElement !== this.attachedContainer) {
+        this.attachedContainer.appendChild(this.videoElement);
+      }
 
       // Wait for video metadata to load and video to start playing
       await new Promise<void>((resolve, reject) => {
@@ -140,6 +174,9 @@ export class CameraManager {
       try {
         this.videoElement.pause();
         this.videoElement.srcObject = null;
+        if (this.videoElement.parentElement) {
+          this.videoElement.parentElement.removeChild(this.videoElement);
+        }
       } catch {
         // Ignore video pause exceptions
       }

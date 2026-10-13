@@ -75,6 +75,8 @@ export interface GestureEngineConfig {
   pinchThresholdMax: number;
   fistCooldownMs: number;
   pointingThreshold: number;
+  pointingCooldownMs: number;
+  deadZone: number;
 }
 
 export const DEFAULT_ENGINE_CONFIG: GestureEngineConfig = {
@@ -84,4 +86,6 @@ export const DEFAULT_ENGINE_CONFIG: GestureEngineConfig = {
   pinchThresholdMax: 0.65,
   fistCooldownMs: 800,
   pointingThreshold: 1.35,
+  pointingCooldownMs: 700,
+  deadZone: 0.04,
 };

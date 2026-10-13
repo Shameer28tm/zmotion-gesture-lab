@@ -216,6 +216,63 @@ export const ControlCenter: React.FC<ControlCenterProps> = ({
         </div>
       </div>
 
+      {/* Real-time Pinch Diagnostics Gauge */}
+      {gestureState.handDetected && (
+        <div
+          style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '4px',
+            padding: '6px 10px',
+            borderRadius: '6px',
+            background: 'rgba(0, 0, 0, 0.35)',
+            border: '1px solid var(--border-subtle)',
+            fontFamily: 'var(--font-mono)',
+            fontSize: '10px',
+          }}
+        >
+          <div style={{ display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)' }}>
+            <span>PINCH ENGAGEMENT</span>
+            <span
+              style={{
+                color:
+                  gestureState.metrics.pinchStrength > 0.65
+                    ? 'var(--electric-cyan)'
+                    : 'var(--text-secondary)',
+                fontWeight: 700,
+              }}
+            >
+              {Math.round(gestureState.metrics.pinchStrength * 100)}%
+            </span>
+          </div>
+          <div
+            style={{
+              width: '100%',
+              height: '4px',
+              backgroundColor: 'rgba(255, 255, 255, 0.1)',
+              borderRadius: '2px',
+              overflow: 'hidden',
+            }}
+          >
+            <div
+              style={{
+                width: `${Math.round(gestureState.metrics.pinchStrength * 100)}%`,
+                height: '100%',
+                backgroundColor:
+                  gestureState.metrics.pinchStrength > 0.65
+                    ? 'var(--electric-cyan)'
+                    : 'var(--electric-blue)',
+                boxShadow:
+                  gestureState.metrics.pinchStrength > 0.65
+                    ? '0 0 8px var(--electric-cyan)'
+                    : 'none',
+                transition: 'width 80ms ease-out',
+              }}
+            />
+          </div>
+        </div>
+      )}
+
       {/* Expanded Tuning Settings */}
       {expanded && (
         <div

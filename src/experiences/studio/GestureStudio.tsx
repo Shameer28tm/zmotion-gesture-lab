@@ -20,13 +20,14 @@ import {
   type StudioPresetShape,
   type StudioControlMode,
 } from './StudioSceneController';
+import { CameraBackdrop } from '../../components/camera/CameraBackdrop';
 import '../../styles/hud.css';
 
 export const GestureStudio: React.FC = () => {
   const canvasContainerRef = useRef<HTMLDivElement | null>(null);
   const controllerRef = useRef<StudioSceneController | null>(null);
 
-  const { engine, gestureState, cameraStatus } = useGestureEngine();
+  const { engine, gestureState, cameraStatus, isRunning } = useGestureEngine();
 
   const [selectedShape, setSelectedShape] = useState<StudioPresetShape>('sphere');
   const [scaleFactor, setScaleFactor] = useState(1.0);
@@ -59,8 +60,14 @@ export const GestureStudio: React.FC = () => {
       controller.updateFromGesture(state, performance.now());
     });
 
+    // Discrete pointing trigger for color changes (fires once, requires release)
+    const unsubscribePointing = engine.onPointingTrigger(() => {
+      controller.cycleNextColor();
+    });
+
     return () => {
       unsubscribeFrame();
+      unsubscribePointing();
       controller.dispose();
       controllerRef.current = null;
     };
@@ -154,10 +161,13 @@ export const GestureStudio: React.FC = () => {
       aria-label="3D Gesture Studio Viewport"
       tabIndex={0}
     >
+      {/* Live Camera Backdrop Layer */}
+      <CameraBackdrop />
+
       {/* Three.js Canvas Container */}
       <div
         ref={canvasContainerRef}
-        className="viewport-canvas-wrapper"
+        className={`viewport-canvas-wrapper ${isRunning ? 'camera-active' : ''}`}
         data-testid="studio-canvas-container"
       />
 

@@ -47,6 +47,24 @@ export class LandmarkNormalizer {
   }
 
   /**
+   * Calculates stable palm centroid from Wrist (0), Index MCP (5), and Pinky MCP (17).
+   * Unlike a single finger MCP, this is anchored to the palm base and does not swing when fingers articulate.
+   */
+  public static getPalmCenter(landmarks: HandLandmarks): LandmarkPoint {
+    if (!landmarks || landmarks.length < 21) {
+      return { x: 0.5, y: 0.5, z: 0 };
+    }
+    const wrist = landmarks[HAND_LANDMARK.WRIST];
+    const indexMcp = landmarks[HAND_LANDMARK.INDEX_FINGER_MCP];
+    const pinkyMcp = landmarks[HAND_LANDMARK.PINKY_MCP];
+    return {
+      x: (wrist.x + indexMcp.x + pinkyMcp.x) / 3,
+      y: (wrist.y + indexMcp.y + pinkyMcp.y) / 3,
+      z: (wrist.z + indexMcp.z + pinkyMcp.z) / 3,
+    };
+  }
+
+  /**
    * Converts raw landmark point (0 to 1) into mirrored centered 3D coordinates (-1 to 1).
    * Upward hand movement maps to positive Y; Rightward movement maps to positive X.
    */
@@ -55,6 +73,27 @@ export class LandmarkNormalizer {
       x: (point.x - 0.5) * -2,
       y: (point.y - 0.5) * -2,
       z: point.z,
+    };
+  }
+
+  /**
+   * Applies configurable dead zone filtering and sensitivity scaling to centered coordinates.
+   */
+  public static applyDeadZoneAndSensitivity(
+    centeredPoint: LandmarkPoint,
+    deadZone: number = 0.04,
+    sensitivity: number = 1.0
+  ): LandmarkPoint {
+    const filter = (val: number): number => {
+      if (Math.abs(val) < deadZone) return 0;
+      const sign = Math.sign(val);
+      return sign * ((Math.abs(val) - deadZone) / (1 - deadZone));
+    };
+
+    return {
+      x: Math.max(-1, Math.min(1, filter(centeredPoint.x) * sensitivity)),
+      y: Math.max(-1, Math.min(1, filter(centeredPoint.y) * sensitivity)),
+      z: centeredPoint.z,
     };
   }
 

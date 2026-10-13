@@ -18,6 +18,7 @@ export type GestureFrameListener = (
 
 export type GestureStateListener = (state: GestureState) => void;
 export type FistTriggerListener = () => void;
+export type PointingTriggerListener = () => void;
 
 export class GestureEngine {
   private static instance: GestureEngine | null = null;
@@ -37,6 +38,7 @@ export class GestureEngine {
   private frameListeners: Set<GestureFrameListener> = new Set();
   private stateListeners: Set<GestureStateListener> = new Set();
   private fistListeners: Set<FistTriggerListener> = new Set();
+  private pointingListeners: Set<PointingTriggerListener> = new Set();
 
   public constructor(config: GestureEngineConfig = DEFAULT_ENGINE_CONFIG) {
     this.config = { ...config };
@@ -119,6 +121,30 @@ export class GestureEngine {
     };
   }
 
+  /**
+   * Discrete event listener for debounced pointing triggers (single trigger upon pointing).
+   */
+  public onPointingTrigger(listener: PointingTriggerListener): () => void {
+    this.pointingListeners.add(listener);
+    return () => {
+      this.pointingListeners.delete(listener);
+    };
+  }
+
+  /**
+   * Attaches the live webcam video element to the given DOM container.
+   */
+  public attachCameraToContainer(container: HTMLElement): void {
+    this.cameraManager.attachToContainer(container);
+  }
+
+  /**
+   * Detaches the live webcam video element from a DOM container.
+   */
+  public detachCameraFromContainer(container?: HTMLElement): void {
+    this.cameraManager.detachFromContainer(container);
+  }
+
   public async start(customVideo?: HTMLVideoElement): Promise<void> {
     if (this.isRunning) return;
 
@@ -175,7 +201,7 @@ export class GestureEngine {
         );
 
         // 2. Smooth continuous metrics and filter state transitions
-        const { stableGesture, smoothedMetrics, fistTriggered } = this.smoother.process(
+        const { stableGesture, smoothedMetrics, fistTriggered, pointingTriggered } = this.smoother.process(
           rawGesture,
           rawMetrics,
           now
@@ -195,6 +221,17 @@ export class GestureEngine {
               listener();
             } catch (err) {
               console.error('Error in fist trigger listener:', err);
+            }
+          });
+        }
+
+        // Notify discrete pointing trigger listeners if fired
+        if (pointingTriggered) {
+          this.pointingListeners.forEach((listener) => {
+            try {
+              listener();
+            } catch (err) {
+              console.error('Error in pointing trigger listener:', err);
             }
           });
         }
@@ -263,6 +300,7 @@ export class GestureEngine {
     this.frameListeners.clear();
     this.stateListeners.clear();
     this.fistListeners.clear();
+    this.pointingListeners.clear();
     GestureEngine.instance = null;
   }
 }

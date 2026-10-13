@@ -11,6 +11,7 @@ export class GestureSmoother {
   private gestureCandidates: Map<GestureType, number> = new Map();
   private lastDiscreteTriggerTimes: Map<string, number> = new Map();
   private isFistLatched: boolean = false;
+  private isPointingLatched: boolean = false;
 
   constructor(config: GestureEngineConfig) {
     this.config = config;
@@ -26,6 +27,15 @@ export class GestureSmoother {
     this.gestureCandidates.clear();
     this.lastDiscreteTriggerTimes.clear();
     this.isFistLatched = false;
+    this.isPointingLatched = false;
+  }
+
+  public resetTracking(): void {
+    this.reset();
+  }
+
+  public getPinchState(): boolean {
+    return this.currentStableGesture === 'PINCH';
   }
 
   /**
@@ -40,11 +50,27 @@ export class GestureSmoother {
     stableGesture: GestureType;
     smoothedMetrics: GestureMetrics;
     fistTriggered: boolean;
+    pointingTriggered: boolean;
   } {
+    // If hand was lost completely, clear discrete latches and reset
+    if (rawGesture === 'NONE' && rawMetrics.confidence === 0) {
+      this.currentStableGesture = 'NONE';
+      this.gestureCandidates.clear();
+      this.isFistLatched = false;
+      this.isPointingLatched = false;
+      this.smoothedMetrics = { ...rawMetrics };
+      return {
+        stableGesture: 'NONE',
+        smoothedMetrics: this.smoothedMetrics,
+        fistTriggered: false,
+        pointingTriggered: false,
+      };
+    }
+
     const alpha = Math.max(0, Math.min(0.99, this.config.smoothingAlpha));
 
-    // 1. Smooth continuous metrics
-    if (!this.smoothedMetrics) {
+    // 1. Smooth continuous metrics with zero-jump reacquisition
+    if (!this.smoothedMetrics || this.smoothedMetrics.confidence === 0) {
       this.smoothedMetrics = { ...rawMetrics };
     } else {
       this.smoothedMetrics = {
@@ -83,12 +109,12 @@ export class GestureSmoother {
     let effectiveGesture = rawGesture;
     if (this.currentStableGesture === 'PINCH') {
       // Stay in PINCH until strength drops below release threshold
-      if (this.smoothedMetrics.pinchStrength > 0.45) {
+      if (this.smoothedMetrics.pinchStrength > 0.40) {
         effectiveGesture = 'PINCH';
       }
     } else if (rawGesture === 'PINCH') {
       // Enter PINCH only if smoothed strength exceeds engagement threshold
-      if (this.smoothedMetrics.pinchStrength < 0.6) {
+      if (this.smoothedMetrics.pinchStrength < 0.65) {
         effectiveGesture = this.currentStableGesture;
       }
     }
@@ -106,7 +132,7 @@ export class GestureSmoother {
       this.gestureCandidates.clear();
     }
 
-    // 4. Fist Trigger Debouncing and Cooldown
+    // 4. Fist Trigger Debouncing and Cooldown (Fires once upon entry, requires release)
     let fistTriggered = false;
     if (this.currentStableGesture === 'CLOSED_FIST') {
       const lastTrigger = this.lastDiscreteTriggerTimes.get('CLOSED_FIST') ?? 0;
@@ -122,10 +148,27 @@ export class GestureSmoother {
       this.isFistLatched = false;
     }
 
+    // 5. Pointing Trigger Debouncing and Cooldown (Fires once upon entry, requires release)
+    let pointingTriggered = false;
+    if (this.currentStableGesture === 'POINTING') {
+      const lastTrigger = this.lastDiscreteTriggerTimes.get('POINTING') ?? 0;
+      const elapsed = timestamp - lastTrigger;
+
+      if (!this.isPointingLatched && elapsed >= this.config.pointingCooldownMs) {
+        pointingTriggered = true;
+        this.isPointingLatched = true;
+        this.lastDiscreteTriggerTimes.set('POINTING', timestamp);
+      }
+    } else {
+      // Release latch when hand is no longer pointing
+      this.isPointingLatched = false;
+    }
+
     return {
       stableGesture: this.currentStableGesture,
       smoothedMetrics: this.smoothedMetrics,
       fistTriggered,
+      pointingTriggered,
     };
   }
 }

@@ -10,9 +10,9 @@ import { GestureProvider } from './core/engine/GestureContext';
 const GestureStudio = lazy(() =>
   import('./experiences/studio/GestureStudio').then((m) => ({ default: m.GestureStudio }))
 );
-const ParticleUniversePlaceholder = lazy(() =>
-  import('./experiences/particles/ParticleUniversePlaceholder').then((m) => ({
-    default: m.ParticleUniversePlaceholder,
+const ParticleUniverse = lazy(() =>
+  import('./experiences/particles/ParticleUniverse').then((m) => ({
+    default: m.ParticleUniverse,
   }))
 );
 const GestureRunnerPlaceholder = lazy(() =>
@@ -90,7 +90,7 @@ export const AppContent: React.FC = () => {
       case 'particles':
         return (
           <Suspense fallback={<RouteLoadingFallback title="Particle Universe" />}>
-            <ParticleUniversePlaceholder />
+            <ParticleUniverse />
           </Suspense>
         );
       case 'runner':

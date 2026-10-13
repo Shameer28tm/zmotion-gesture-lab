@@ -132,6 +132,7 @@ export class StudioSceneController {
       this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
       this.renderer.toneMapping = ACESFilmicToneMapping;
       this.renderer.toneMappingExposure = 1.15;
+      this.renderer.setClearColor(0x000000, 0);
 
       const canvas = this.renderer.domElement;
       canvas.style.width = '100%';
@@ -296,6 +297,12 @@ export class StudioSceneController {
     this.callbacks.onColorChange?.(hexColor);
   }
 
+  public cycleNextColor(): void {
+    this.paletteIndex = (this.paletteIndex + 1) % this.palette.length;
+    const nextColor = this.palette[this.paletteIndex];
+    this.setColor(nextColor);
+  }
+
   public setWireframeOnly(wireframeOnly: boolean): void {
     this.wireframeOnly = wireframeOnly;
     if (this.solidMesh) {
@@ -369,9 +376,7 @@ export class StudioSceneController {
           )
         ) {
           this.lastPointingTriggerTime = now;
-          this.paletteIndex = (this.paletteIndex + 1) % this.palette.length;
-          const nextColor = this.palette[this.paletteIndex];
-          this.setColor(nextColor);
+          this.cycleNextColor();
         }
       }
 
