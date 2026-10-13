@@ -4,7 +4,7 @@ import { Footer } from './components/layout/Footer';
 import { OnboardingModal } from './components/onboarding/OnboardingModal';
 import type { ExperienceRoute } from './types/navigation';
 import { HomeLanding } from './experiences/home/HomeLanding';
-import { GestureStudioPlaceholder } from './experiences/studio/GestureStudioPlaceholder';
+import { GestureStudio } from './experiences/studio/GestureStudio';
 import { ParticleUniversePlaceholder } from './experiences/particles/ParticleUniversePlaceholder';
 import { GestureRunnerPlaceholder } from './experiences/runner/GestureRunnerPlaceholder';
 import { AboutExperience } from './experiences/about/AboutExperience';
@@ -40,7 +40,7 @@ export const AppContent: React.FC = () => {
   const renderActiveRoute = () => {
     switch (currentRoute) {
       case 'studio':
-        return <GestureStudioPlaceholder />;
+        return <GestureStudio />;
       case 'particles':
         return <ParticleUniversePlaceholder />;
       case 'runner':
