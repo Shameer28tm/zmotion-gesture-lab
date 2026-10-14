@@ -28,6 +28,54 @@ export const DEFAULT_PARTICLE_CONFIG: ParticleConfig = {
   morphDurationMs: 1200,
 };
 
+export interface ParticleScaleConfig {
+  desktopBaseScale: number;
+  mobileBaseScale: number;
+  desktopMinScale: number;
+  desktopMaxScale: number;
+  mobileMinScale: number;
+  mobileMaxScale: number;
+}
+
+export const PARTICLE_SCALE_CONFIG: ParticleScaleConfig = {
+  desktopBaseScale: 1.0,
+  mobileBaseScale: 0.52,
+  desktopMinScale: 0.50,
+  desktopMaxScale: 2.20,
+  mobileMinScale: 0.28,
+  mobileMaxScale: 1.15,
+};
+
+/**
+ * Determines whether current screen or viewport container constitutes a mobile layout
+ */
+export function isMobileViewport(width: number, height: number): boolean {
+  if (typeof window !== 'undefined') {
+    if (window.innerWidth <= 768) return true;
+    if (window.matchMedia && window.matchMedia('(max-width: 768px)').matches) return true;
+    if (window.matchMedia && window.matchMedia('(pointer: coarse)').matches && Math.min(width, height) <= 768) {
+      return true;
+    }
+  }
+  return width <= 768 || (width < 1024 && width < height);
+}
+
+/**
+ * Returns default base scale for mobile vs desktop
+ */
+export function getBaseScale(isMobile: boolean): number {
+  return isMobile ? PARTICLE_SCALE_CONFIG.mobileBaseScale : PARTICLE_SCALE_CONFIG.desktopBaseScale;
+}
+
+/**
+ * Returns sensible scale bounds [minScale, maxScale] for mobile vs desktop
+ */
+export function getScaleBounds(isMobile: boolean): { minScale: number; maxScale: number } {
+  return isMobile
+    ? { minScale: PARTICLE_SCALE_CONFIG.mobileMinScale, maxScale: PARTICLE_SCALE_CONFIG.mobileMaxScale }
+    : { minScale: PARTICLE_SCALE_CONFIG.desktopMinScale, maxScale: PARTICLE_SCALE_CONFIG.desktopMaxScale };
+}
+
 /** Pseudo-random deterministic noise generator based on index */
 function pseudoRandom(seed: number): number {
   const x = Math.sin(seed * 12.9898 + 78.233) * 43758.5453;

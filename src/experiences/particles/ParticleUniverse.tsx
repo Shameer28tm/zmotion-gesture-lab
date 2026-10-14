@@ -24,6 +24,8 @@ import {
 import {
   type ParticlePresetShape,
   DEFAULT_PARTICLE_CONFIG,
+  PARTICLE_SCALE_CONFIG,
+  getScaleBounds,
 } from './particleMath';
 import { CameraBackdrop } from '../../components/camera/CameraBackdrop';
 import { CaptureControls } from '../../components/capture/CaptureControls';
@@ -41,7 +43,11 @@ export const ParticleUniverse: React.FC = () => {
   const [currentShape, setCurrentShape] = useState<ParticlePresetShape>('sphere');
   const [particleCount, setParticleCount] = useState<number>(DEFAULT_PARTICLE_CONFIG.defaultCount);
   const [isPaused, setIsPaused] = useState(false);
-  const [expansion, setExpansion] = useState(1.0);
+  const [expansion, setExpansion] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth <= 768
+      ? PARTICLE_SCALE_CONFIG.mobileBaseScale
+      : PARTICLE_SCALE_CONFIG.desktopBaseScale
+  );
   const [controlMode, setControlMode] = useState<'GESTURE' | 'MANUAL'>('MANUAL');
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
@@ -60,7 +66,8 @@ export const ParticleUniverse: React.FC = () => {
 
     // Synchronize initial configuration
     controller.setShape(currentShape);
-    controller.setExpansion(expansion);
+    // Align React state with controller's responsive base scale
+    setExpansion(controller.getCurrentExpansion());
 
     // High-frequency per-frame gesture subscription (decoupled from React render cycle)
     const unsubscribeFrame = engine.onFrame((state) => {
@@ -92,14 +99,12 @@ export const ParticleUniverse: React.FC = () => {
 
   // Handle Manual Expansion / Spread
   const handleExpansionStep = useCallback((delta: number) => {
-    setExpansion((prev) => {
-      const next = Math.max(
-        DEFAULT_PARTICLE_CONFIG.minScale,
-        Math.min(DEFAULT_PARTICLE_CONFIG.maxScale, Number((prev + delta).toFixed(2)))
-      );
-      controllerRef.current?.setExpansion(next);
-      return next;
-    });
+    if (!controllerRef.current) return;
+    const current = controllerRef.current.getCurrentExpansion();
+    const { minScale, maxScale } = controllerRef.current.getScaleBounds();
+    const next = Math.max(minScale, Math.min(maxScale, Number((current + delta).toFixed(2))));
+    controllerRef.current.setExpansion(next);
+    setExpansion(next);
   }, []);
 
   // Handle Play/Pause Drift
@@ -114,7 +119,9 @@ export const ParticleUniverse: React.FC = () => {
   const handleResetScene = useCallback(() => {
     controllerRef.current?.reset();
     setCurrentShape('sphere');
-    setExpansion(1.0);
+    if (controllerRef.current) {
+      setExpansion(controllerRef.current.getCurrentExpansion());
+    }
     setIsPaused(false);
     setControlMode('MANUAL');
   }, []);
@@ -180,6 +187,8 @@ export const ParticleUniverse: React.FC = () => {
 
   const shapeIndex = shapes.indexOf(currentShape);
   const isGestureActive = controlMode === 'GESTURE' && gestureState.handDetected;
+  const isMobileScreen = typeof window !== 'undefined' && window.innerWidth <= 768;
+  const currentBounds = controllerRef.current?.getScaleBounds() ?? getScaleBounds(isMobileScreen);
 
   return (
     <div
@@ -401,7 +410,7 @@ export const ParticleUniverse: React.FC = () => {
                     size="sm"
                     icon={<ZoomOut size={12} />}
                     onClick={() => handleExpansionStep(-0.2)}
-                    disabled={expansion <= DEFAULT_PARTICLE_CONFIG.minScale}
+                    disabled={expansion <= currentBounds.minScale}
                     style={{ padding: '4px 6px', height: '24px' }}
                     title="Contract cloud (-)"
                   />
@@ -421,7 +430,7 @@ export const ParticleUniverse: React.FC = () => {
                     size="sm"
                     icon={<ZoomIn size={12} />}
                     onClick={() => handleExpansionStep(0.2)}
-                    disabled={expansion >= DEFAULT_PARTICLE_CONFIG.maxScale}
+                    disabled={expansion >= currentBounds.maxScale}
                     style={{ padding: '4px 6px', height: '24px' }}
                     title="Expand cloud (+)"
                   />
@@ -579,8 +588,8 @@ export const ParticleUniverse: React.FC = () => {
               variant="outline"
               size="md"
               icon={<ZoomOut size={15} />}
-              onClick={() => handleExpansionStep(-0.2)}
-              disabled={expansion <= DEFAULT_PARTICLE_CONFIG.minScale}
+              onClick={() => handleExpansionStep(-0.15)}
+              disabled={expansion <= currentBounds.minScale}
             >
               Contract
             </Button>
@@ -588,8 +597,8 @@ export const ParticleUniverse: React.FC = () => {
               variant="outline"
               size="md"
               icon={<ZoomIn size={15} />}
-              onClick={() => handleExpansionStep(0.2)}
-              disabled={expansion >= DEFAULT_PARTICLE_CONFIG.maxScale}
+              onClick={() => handleExpansionStep(0.15)}
+              disabled={expansion >= currentBounds.maxScale}
             >
               Expand
             </Button>

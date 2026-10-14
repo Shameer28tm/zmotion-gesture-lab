@@ -12,6 +12,10 @@ import type { GestureState } from '../../core/types';
 import {
   type ParticlePresetShape,
   DEFAULT_PARTICLE_CONFIG,
+  PARTICLE_SCALE_CONFIG,
+  isMobileViewport,
+  getBaseScale,
+  getScaleBounds,
   generatePresetPositions,
   generatePresetColors,
   easeCubicInOut,
@@ -56,9 +60,12 @@ export class ParticleSceneController {
   // Continuous Dynamic Transforms
   private currentRotation = { x: 0, y: 0 };
   private targetRotation = { x: 0, y: 0 };
-  private currentExpansion: number = 1.0;
-  private targetExpansion: number = 1.0;
-  private baseExpansion: number = 1.0;
+  private currentExpansion: number = PARTICLE_SCALE_CONFIG.desktopBaseScale;
+  private targetExpansion: number = PARTICLE_SCALE_CONFIG.desktopBaseScale;
+  private baseExpansion: number = PARTICLE_SCALE_CONFIG.desktopBaseScale;
+  private userExpansion: number = PARTICLE_SCALE_CONFIG.desktopBaseScale;
+  private isMobileViewport: boolean = false;
+  private explicitIsMobile: boolean | null = null;
 
   private isPaused: boolean = false;
   private controlMode: 'GESTURE' | 'MANUAL' = 'MANUAL';
@@ -92,12 +99,20 @@ export class ParticleSceneController {
     this.container = container;
     this.particleCount = count;
 
-    // 1. Three.js Scene & Camera
-    this.scene = new Scene();
     const width = container.clientWidth || 800;
     const height = container.clientHeight || 600;
+
+    // Detect responsive mobile profile (mobile Safari, small screens, narrow portrait)
+    this.isMobileViewport = this.checkIsMobile(width, height);
+    this.baseExpansion = getBaseScale(this.isMobileViewport);
+    this.userExpansion = this.baseExpansion;
+    this.targetExpansion = this.baseExpansion;
+    this.currentExpansion = this.baseExpansion;
+
+    // 1. Three.js Scene & Camera with adaptive framing
+    this.scene = new Scene();
     this.camera = new PerspectiveCamera(45, width / height, 0.1, 100);
-    this.camera.position.set(0, 0, 7.5);
+    this.updateCameraFraming(width, height);
 
     // 2. High-performance Transparent Renderer
     try {
@@ -160,6 +175,7 @@ export class ParticleSceneController {
     });
 
     this.pointsMesh = new Points(this.geometry, this.material);
+    this.pointsMesh.scale.setScalar(this.currentExpansion);
     this.scene.add(this.pointsMesh);
 
     // 5. User Input Listeners
@@ -177,16 +193,73 @@ export class ParticleSceneController {
     });
     this.resizeObserver.observe(container);
 
+    // Inform listeners of initial base scale
+    this.callbacks.onExpansionChange?.(Number(this.baseExpansion.toFixed(2)));
+
     // 7. Start Animation Loop
     this.lastFrameTime = performance.now();
     this.animationFrameId = requestAnimationFrame(this.renderLoop);
   }
 
-  public resize(width: number, height: number): void {
-    if (!this.renderer || !this.camera || width <= 0 || height <= 0) return;
-    this.camera.aspect = width / height;
+  /**
+   * Recalculates camera projection and distance framing to guarantee
+   * particle presets (Sphere, Heart, Saturn, Flower, DNA) remain completely
+   * framed without clipping across all mobile and desktop viewports.
+   */
+  public updateCameraFraming(width: number, height: number): void {
+    if (!this.camera || width <= 0 || height <= 0) return;
+
+    const aspect = width / height;
+    this.camera.aspect = aspect;
+
+    const isMobile = this.checkIsMobile(width, height);
+    this.isMobileViewport = isMobile;
+
+    if (isMobile) {
+      // In mobile portrait (aspect < 1.0), horizontal FOV narrows significantly.
+      // Three.js perspective camera uses vertical FOV (45 deg).
+      // Target bounding width ~3.85 units (fits Saturn ring diameter 7.3 at 0.52 base scale with safety margin):
+      const targetBoundingWidth = 3.85;
+      const fovRad = (this.camera.fov * Math.PI) / 180;
+      const tanHalfFov = Math.tan(fovRad / 2);
+      const requiredZ = (targetBoundingWidth / 2) / (tanHalfFov * aspect);
+
+      // Frame camera smoothly between 7.5 (landscape) and 10.0 (narrow portrait 320-390px)
+      const framedZ = Math.max(7.5, Math.min(10.0, requiredZ));
+      this.camera.position.set(0, 0, framedZ);
+    } else {
+      // Desktop standard camera distance
+      this.camera.position.set(0, 0, 7.5);
+    }
+
     this.camera.updateProjectionMatrix();
-    this.renderer.setSize(width, height);
+  }
+
+  public resize(width: number, height: number): void {
+    if (width <= 0 || height <= 0) return;
+    const wasMobile = this.isMobileViewport;
+    this.isMobileViewport = this.checkIsMobile(width, height);
+
+    if (this.camera) {
+      this.updateCameraFraming(width, height);
+    }
+    if (this.renderer) {
+      this.renderer.setSize(width, height);
+    }
+
+    // If viewport profile changed (e.g. tablet rotated to portrait), adapt scale bounds
+    if (wasMobile !== this.isMobileViewport) {
+      const newBase = getBaseScale(this.isMobileViewport);
+      const { minScale, maxScale } = this.getScaleBounds();
+      const ratio = this.isMobileViewport
+        ? PARTICLE_SCALE_CONFIG.mobileBaseScale / PARTICLE_SCALE_CONFIG.desktopBaseScale
+        : PARTICLE_SCALE_CONFIG.desktopBaseScale / PARTICLE_SCALE_CONFIG.mobileBaseScale;
+
+      this.baseExpansion = newBase;
+      this.userExpansion = Math.max(minScale, Math.min(maxScale, Number((this.userExpansion * ratio).toFixed(2))));
+      this.targetExpansion = this.userExpansion;
+      this.callbacks.onExpansionChange?.(this.userExpansion);
+    }
   }
 
   /**
@@ -216,15 +289,13 @@ export class ParticleSceneController {
   }
 
   public setExpansion(expansion: number): void {
-    this.baseExpansion = Math.max(
-      DEFAULT_PARTICLE_CONFIG.minScale,
-      Math.min(DEFAULT_PARTICLE_CONFIG.maxScale, expansion)
-    );
-    this.targetExpansion = this.baseExpansion;
+    const { minScale, maxScale } = this.getScaleBounds();
+    this.userExpansion = Math.max(minScale, Math.min(maxScale, expansion));
+    this.targetExpansion = this.userExpansion;
     if (!this.pointsMesh) {
-      this.currentExpansion = this.baseExpansion;
+      this.currentExpansion = this.userExpansion;
     }
-    this.callbacks.onExpansionChange?.(Number(this.baseExpansion.toFixed(2)));
+    this.callbacks.onExpansionChange?.(Number(this.userExpansion.toFixed(2)));
   }
 
   public togglePause(): boolean {
@@ -235,22 +306,28 @@ export class ParticleSceneController {
   public reset(): void {
     this.targetRotation = { x: 0, y: 0 };
     this.currentRotation = { x: 0, y: 0 };
-    this.baseExpansion = 1.0;
-    this.targetExpansion = 1.0;
-    this.currentExpansion = 1.0;
+    const base = getBaseScale(this.isMobileViewport);
+    this.baseExpansion = base;
+    this.userExpansion = base;
+    this.targetExpansion = base;
+    this.currentExpansion = base;
     this.isPaused = false;
     this.controlMode = 'MANUAL';
     if (this.pointsMesh) {
       this.pointsMesh.rotation.set(0, 0, 0);
-      this.pointsMesh.scale.set(1, 1, 1);
+      this.pointsMesh.scale.setScalar(base);
     }
     this.setShape('sphere');
-    this.callbacks.onExpansionChange?.(1.0);
+    this.callbacks.onExpansionChange?.(Number(base.toFixed(2)));
     this.callbacks.onControlModeChange?.('MANUAL');
   }
 
   /**
-   * Per-frame gesture updates decoupled from React renders
+   * Per-frame gesture updates decoupled from React renders.
+   * Natural pinch-to-zoom:
+   * - Pinch outward (spread / OPEN_PALM) -> enlarge
+   * - Pinch inward (close / PINCH) -> shrink
+   * - Releasing pinch or neutral hand preserves current scale (no snap-back)
    */
   public updateFromGesture(state: GestureState, _now: number): void {
     if (state.handDetected) {
@@ -265,22 +342,22 @@ export class ParticleSceneController {
       this.targetRotation.y = rot.rotY * 0.9;
 
       // 2. Continuous Universe Radial Expansion
-      // Pinched (1.0) -> contracted (0.5x); Spread Open Palm (0.0) -> expanded (2.2x)
+      // Pinched (1.0) -> contracted; Spread Open Palm (0.0) -> expanded
+      // Scale is bounded to device-specific [minScale, maxScale]
       if (state.activeGesture === 'PINCH' || state.activeGesture === 'OPEN_PALM') {
+        const { minScale, maxScale } = this.getScaleBounds();
         const pinchStrength = Math.max(0, Math.min(1, state.metrics.pinchStrength));
-        const targetScale =
-          DEFAULT_PARTICLE_CONFIG.minScale +
-          (1.0 - pinchStrength) * (DEFAULT_PARTICLE_CONFIG.maxScale - DEFAULT_PARTICLE_CONFIG.minScale);
+        const targetScale = minScale + (1.0 - pinchStrength) * (maxScale - minScale);
         this.targetExpansion = Number(targetScale.toFixed(2));
+        this.userExpansion = this.targetExpansion;
+        if (!this.pointsMesh) {
+          this.currentExpansion = this.targetExpansion;
+        }
         this.callbacks.onExpansionChange?.(this.targetExpansion);
-      } else {
-        this.targetExpansion = this.baseExpansion;
-        this.callbacks.onExpansionChange?.(this.baseExpansion);
       }
-    } else {
-      // Hand out of frame: ease back towards base expansion
-      this.targetExpansion = this.baseExpansion;
+      // Releasing pinch / neutral hand pose: scale remains locked at this.userExpansion
     }
+    // Hand out of frame: scale remains locked at this.userExpansion (no snap-back)
   }
 
   // --- Manual Pointer & Wheel Fallbacks ---
@@ -317,10 +394,12 @@ export class ParticleSceneController {
       this.callbacks.onControlModeChange?.('MANUAL');
     }
 
+    const { minScale, maxScale } = this.getScaleBounds();
     const direction = e.deltaY > 0 ? -1 : 1;
+    const step = this.isMobileViewport ? 0.06 : 0.12;
     const nextExpansion = Math.max(
-      DEFAULT_PARTICLE_CONFIG.minScale,
-      Math.min(DEFAULT_PARTICLE_CONFIG.maxScale, this.baseExpansion + direction * 0.12)
+      minScale,
+      Math.min(maxScale, this.userExpansion + direction * step)
     );
     this.setExpansion(Number(nextExpansion.toFixed(2)));
   }
@@ -449,5 +528,44 @@ export class ParticleSceneController {
 
   public getControlMode(): 'GESTURE' | 'MANUAL' {
     return this.controlMode;
+  }
+
+  public checkIsMobile(width: number, height: number): boolean {
+    if (this.explicitIsMobile !== null) {
+      return this.explicitIsMobile;
+    }
+    return isMobileViewport(width, height);
+  }
+
+  public setIsMobile(isMobile: boolean | null): void {
+    this.explicitIsMobile = isMobile;
+    const width = this.container?.clientWidth || (typeof window !== 'undefined' ? window.innerWidth : 800);
+    const height = this.container?.clientHeight || (typeof window !== 'undefined' ? window.innerHeight : 600);
+    const wasMobile = this.isMobileViewport;
+    this.isMobileViewport = this.checkIsMobile(width, height);
+    this.baseExpansion = getBaseScale(this.isMobileViewport);
+    if (wasMobile !== this.isMobileViewport) {
+      this.userExpansion = this.baseExpansion;
+      this.targetExpansion = this.baseExpansion;
+      this.currentExpansion = this.baseExpansion;
+      this.callbacks.onExpansionChange?.(this.baseExpansion);
+    }
+    this.resize(width, height);
+  }
+
+  public getIsMobile(): boolean {
+    return this.isMobileViewport;
+  }
+
+  public getBaseScale(): number {
+    return this.baseExpansion;
+  }
+
+  public getScaleBounds(): { minScale: number; maxScale: number } {
+    return getScaleBounds(this.isMobileViewport);
+  }
+
+  public getCamera(): PerspectiveCamera | null {
+    return this.camera;
   }
 }
