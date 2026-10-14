@@ -2,6 +2,7 @@ import { CameraManager } from '../camera/CameraManager';
 import { HandLandmarkerService } from '../vision/HandLandmarkerService';
 import { GestureClassifier } from '../gestures/GestureClassifier';
 import { GestureSmoother } from '../gestures/GestureSmoother';
+import { MultiHandTracker, type TrackedHand } from '../vision/MultiHandTracker';
 import {
   DEFAULT_ENGINE_CONFIG,
   type CameraStatus,
@@ -14,7 +15,8 @@ import {
 
 export type GestureFrameListener = (
   state: GestureState,
-  rawLandmarks: HandLandmarks | null
+  rawLandmarks: HandLandmarks | null,
+  allHands?: TrackedHand[]
 ) => void;
 
 export type GestureStateListener = (state: GestureState) => void;
@@ -28,12 +30,14 @@ export class GestureEngine {
   private cameraManager: CameraManager;
   private landmarkerService: HandLandmarkerService;
   private smoother: GestureSmoother;
+  private multiHandTracker: MultiHandTracker;
   private config: GestureEngineConfig;
 
   private isRunning = false;
   private animationFrameId: number | null = null;
 
   private currentState: GestureState;
+  private currentTrackedHands: TrackedHand[] = [];
   private previousReportedGesture: GestureType = 'NONE';
   private previousHandDetected: boolean = false;
 
@@ -71,6 +75,7 @@ export class GestureEngine {
     this.cameraManager = new CameraManager();
     this.landmarkerService = new HandLandmarkerService();
     this.smoother = new GestureSmoother(this.config);
+    this.multiHandTracker = new MultiHandTracker();
 
     this.currentState = {
       activeGesture: 'NONE',
@@ -104,6 +109,10 @@ export class GestureEngine {
 
   public getState(): GestureState {
     return { ...this.currentState };
+  }
+
+  public getTrackedHands(): TrackedHand[] {
+    return this.multiHandTracker.getTrackedHands();
   }
 
   public getDiagnostics(): EngineDiagnostics {
@@ -183,12 +192,17 @@ export class GestureEngine {
   public async start(customVideo?: HTMLVideoElement): Promise<void> {
     if (this.isRunning) return;
 
-    // 1. Concurrently initialize HandLandmarker and request Camera stream
+    // 1. Concurrently initialize HandLandmarker with numHands: 2 and request Camera stream
     const modelPromise = !this.landmarkerService.isInitialized()
-      ? this.landmarkerService.initialize({
-          detectionConfidence: this.config.detectionConfidence,
-          trackingConfidence: this.config.trackingConfidence,
-        })
+      ? this.landmarkerService
+          .initialize({
+            detectionConfidence: this.config.detectionConfidence,
+            trackingConfidence: this.config.trackingConfidence,
+            numHands: 2,
+          })
+          .catch((err) => {
+            console.warn('Vision model initialization fallback mode active:', err);
+          })
       : Promise.resolve();
 
     const cameraPromise = this.cameraManager.start(customVideo);
@@ -214,6 +228,7 @@ export class GestureEngine {
     }
     this.cameraManager.stop();
     this.smoother.reset();
+    this.multiHandTracker.reset();
 
     this.currentState = {
       activeGesture: 'NONE',
@@ -221,18 +236,21 @@ export class GestureEngine {
       handDetected: false,
       handedness: 'Unknown',
     };
+    this.currentTrackedHands = [];
     this.lastRawLandmarks = null;
     this.notifyStateChange();
   }
 
   public resetTrackingState(): void {
     this.smoother.reset();
+    this.multiHandTracker.reset();
     this.currentState = {
       activeGesture: 'NONE',
       metrics: GestureClassifier.createEmptyMetrics(),
       handDetected: false,
       handedness: 'Unknown',
     };
+    this.currentTrackedHands = [];
     this.lastRawLandmarks = null;
     this.lastValidHandTime = 0;
     this.previousReportedGesture = 'NONE';
@@ -295,30 +313,35 @@ export class GestureEngine {
           this.lastFpsCalcTime = now;
         }
 
-        if (result && result.landmarks && result.landmarks.length > 0) {
+        const detectedLandmarks = (result?.landmarks as HandLandmarks[]) || [];
+        const handednessList = result?.handedness as
+          | Array<Array<{ categoryName?: string; score?: number }>>
+          | undefined;
+
+        // Update multi-hand tracker with raw detections
+        const trackedHands = this.multiHandTracker.update(
+          detectedLandmarks,
+          handednessList,
+          now,
+          this.config
+        );
+        this.currentTrackedHands = trackedHands;
+
+        const primaryHand = this.multiHandTracker.getPrimaryHand();
+
+        if (primaryHand && !primaryHand.isGracePeriod) {
           this.lastValidHandTime = now;
-          const rawLandmarks = result.landmarks[0] as HandLandmarks;
-          this.lastRawLandmarks = rawLandmarks;
-          const handedness =
-            result.handedness && result.handedness[0] && result.handedness[0][0]
-              ? (result.handedness[0][0].categoryName as 'Left' | 'Right')
-              : 'Unknown';
+          this.lastRawLandmarks = primaryHand.smoothedLandmarks;
 
-          // 1. Classify raw gesture
-          const { gesture: rawGesture, metrics: rawMetrics } = GestureClassifier.classify(
-            rawLandmarks,
-            this.config
-          );
-
-          // 2. Adaptive velocity-aware smoothing
+          // 1. Adaptive velocity-aware smoothing on primary metrics for discrete triggers (fist, pointing)
           const { stableGesture, smoothedMetrics, fistTriggered, pointingTriggered } =
-            this.smoother.process(rawGesture, rawMetrics, now);
+            this.smoother.process(primaryHand.gesture, primaryHand.metrics, now);
 
           this.currentState = {
             activeGesture: stableGesture,
             metrics: smoothedMetrics,
             handDetected: true,
-            handedness,
+            handedness: primaryHand.handedness,
           };
 
           // Update diagnostics
@@ -355,8 +378,11 @@ export class GestureEngine {
               }
             });
           }
+        } else if (trackedHands.length > 0 && primaryHand) {
+          // Hand is in temporary grace period (e.g. 1 frame dropped), maintain position
+          this.lastRawLandmarks = primaryHand.smoothedLandmarks;
         } else {
-          // Hand not in view
+          // No active hands in view
           this.lastRawLandmarks = null;
           const { stableGesture, smoothedMetrics } = this.smoother.process(
             'NONE',
@@ -416,6 +442,8 @@ export class GestureEngine {
           handedness: 'Unknown',
         };
         this.lastRawLandmarks = null;
+        this.multiHandTracker.reset();
+        this.currentTrackedHands = [];
         this.diagnostics.handDetected = false;
         this.diagnostics.activeGesture = 'NONE';
         this.previousReportedGesture = 'NONE';
@@ -426,7 +454,7 @@ export class GestureEngine {
       // Always deliver smoothed 3D frame updates to renderers on every RAF tick
       this.frameListeners.forEach((listener) => {
         try {
-          listener(this.currentState, this.lastRawLandmarks);
+          listener(this.currentState, this.lastRawLandmarks, this.currentTrackedHands);
         } catch (err) {
           console.error('Error in frame listener:', err);
         }

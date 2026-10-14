@@ -5,6 +5,35 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ---
 
+## [1.2.0] - 2026-10-14
+
+### Added
+- **Simultaneous Dual-Hand Tracking & Skeleton Rendering**:
+  - Configured MediaPipe Tasks Vision to `numHands: 2` across both GPU and CPU delegates.
+  - Implemented `MultiHandTracker` engine tracking up to two hands simultaneously with independent IDs and metrics.
+  - Safe association strategy combining Euclidean centroid proximity, velocity trajectory projection, and soft handedness affinity to resolve MediaPipe's non-deterministic hand array ordering and prevent identity swapping when hands cross.
+  - Independent grace period management: when one hand temporarily drops out of frame, a ~200ms grace period holds its skeleton before cleanly removing it, while the remaining hand continues tracking and rendering seamlessly.
+  - Upgraded `HandSkeletonRenderer.renderHands`: simultaneous 21-node anatomical skeleton rendering per hand with distinct color styling (Electric Blue `#00d2ff` for Hand 1 / Left Hand, and Electric Cyan `#00f5d4` for Hand 2 / Right Hand) and wrist telemetry badges (`● L · GESTURE` / `● R · GESTURE`).
+  - Decoupled `HandSkeletonOverlay` subscribed to high-frequency animation frames without React state re-render overhead.
+- **Adaptive Velocity-Aware Landmark Filter (`LandmarkFilter`)**:
+  - Implemented per-hand `LandmarkFilter` with dynamic velocity adaptation.
+  - Stationary jitter suppression ($\alpha \approx 0.68$) eliminating webcam sensor micro-fluctuations.
+  - Fast-sweep responsiveness ($\alpha \approx 0.10$) preventing trailing lag behind fast physical hand movements.
+  - Zero-jump tracking reacquisition on first detection and after tracking loss.
+  - Independent filter instances ensuring coordinates between Hand 1 and Hand 2 are never averaged together.
+- **Mobile Responsiveness & Viewport Refinement**:
+  - Audited layouts across 320px, 360px, 390px, 430px, tablet, and desktop viewports.
+  - Added ultra-compact mobile rules in `hud.css` (`@media (max-width: 380px)`) preventing horizontal overflow on 320px screens.
+  - Added `touch-action: manipulation` and `-webkit-tap-highlight-color: transparent` across interactive HUD controls, eliminating the 300ms mobile browser tap delay.
+  - Dynamic viewport height fallback (`min(88dvh, 88vh)`) and safe-area insets (`env(safe-area-inset-bottom)`) in `MobileControlDrawer`.
+  - Added `@media (prefers-reduced-motion: reduce)` support across HUD, drawer transitions, and pulse indicators.
+- **Dual-Hand & Viewport Automated Test Suites**:
+  - Added `src/test/dualHandTracking.test.ts` (0, 1, 2 hands, independent hand loss, hand crossing, adaptive velocity smoothing, and simultaneous skeleton rendering).
+  - Added `src/test/mobileViewports.test.ts` (CSS media queries, safe areas, touch optimization, reduced motion, and horizontal overflow prevention).
+  - Test suite expanded to 109 passing automated tests across 13 test suites.
+
+---
+
 ## [1.1.0] - 2026-10-14
 
 ### Added

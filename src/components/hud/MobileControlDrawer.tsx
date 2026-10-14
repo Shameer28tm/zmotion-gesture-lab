@@ -73,7 +73,8 @@ export const MobileControlDrawer: React.FC<MobileControlDrawerProps> = ({
         style={{
           position: 'relative',
           width: '100%',
-          maxHeight: '85dvh',
+          maxWidth: '100vw',
+          maxHeight: 'min(88dvh, 88vh)',
           background: 'linear-gradient(180deg, rgba(12, 18, 34, 0.98) 0%, rgba(6, 10, 20, 0.99) 100%)',
           backdropFilter: 'blur(24px)',
           WebkitBackdropFilter: 'blur(24px)',
@@ -84,6 +85,7 @@ export const MobileControlDrawer: React.FC<MobileControlDrawerProps> = ({
           flexDirection: 'column',
           zIndex: 1,
           overflow: 'hidden',
+          overflowX: 'hidden',
           animation: 'slideUpDrawer 0.25s cubic-bezier(0.16, 1, 0.3, 1) forwards',
         }}
       >

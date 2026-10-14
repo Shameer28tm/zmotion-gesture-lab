@@ -46,8 +46,8 @@ export const HandSkeletonOverlay: React.FC<HandSkeletonOverlayProps> = ({
     window.addEventListener('resize', handleWindowResize);
 
     // High-frequency subscription: runs per animation frame, decoupled from React renders
-    const unsubscribeFrame = engine.onFrame((state, rawLandmarks) => {
-      if (!isVisible || !rawLandmarks || !state.handDetected || !containerRef.current) {
+    const unsubscribeFrame = engine.onFrame((state, primaryLandmarks, allHands) => {
+      if (!isVisible || !containerRef.current) {
         rendererRef.current?.clear();
         return;
       }
@@ -60,14 +60,34 @@ export const HandSkeletonOverlay: React.FC<HandSkeletonOverlayProps> = ({
       const videoWidth = video && video.videoWidth > 0 ? video.videoWidth : 640;
       const videoHeight = video && video.videoHeight > 0 ? video.videoHeight : 480;
 
-      rendererRef.current?.render(
-        rawLandmarks,
-        width,
-        height,
-        videoWidth,
-        videoHeight,
-        state
-      );
+      if (allHands && allHands.length > 0) {
+        const renderItems = allHands.map((h) => ({
+          landmarks: h.smoothedLandmarks,
+          gesture: h.gesture,
+          handedness: h.handedness,
+          metrics: h.metrics,
+          id: h.id,
+          isGracePeriod: h.isGracePeriod,
+        }));
+        rendererRef.current?.renderHands(
+          renderItems,
+          width,
+          height,
+          videoWidth,
+          videoHeight
+        );
+      } else if (primaryLandmarks && state.handDetected) {
+        rendererRef.current?.render(
+          primaryLandmarks,
+          width,
+          height,
+          videoWidth,
+          videoHeight,
+          state
+        );
+      } else {
+        rendererRef.current?.clear();
+      }
     });
 
     return () => {

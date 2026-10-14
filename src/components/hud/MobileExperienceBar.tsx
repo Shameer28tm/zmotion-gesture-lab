@@ -57,7 +57,7 @@ export const MobileExperienceBar: React.FC<MobileExperienceBarProps> = ({
       }}
     >
       {/* Left: Compact Status & Tracking */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+      <div className="mobile-bar-left" style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0, flex: 1 }}>
         {/* Quick Camera status / toggle */}
         <button
           type="button"
@@ -76,14 +76,16 @@ export const MobileExperienceBar: React.FC<MobileExperienceBarProps> = ({
             justifyContent: 'center',
             minWidth: '32px',
             minHeight: '32px',
+            touchAction: 'manipulation',
           }}
         >
           {isRunning ? <Camera size={14} color="#00ff88" /> : <CameraOff size={14} />}
         </button>
 
-        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', minWidth: 0 }}>
             <span
+              className="mobile-bar-title"
               style={{
                 fontFamily: 'var(--font-sans)',
                 fontWeight: 700,
@@ -98,6 +100,7 @@ export const MobileExperienceBar: React.FC<MobileExperienceBarProps> = ({
             </span>
             {badge && (
               <span
+                className="mobile-bar-badge"
                 style={{
                   fontFamily: 'var(--font-mono)',
                   fontSize: '9px',
@@ -106,6 +109,7 @@ export const MobileExperienceBar: React.FC<MobileExperienceBarProps> = ({
                   borderRadius: '3px',
                   background: 'rgba(0, 245, 212, 0.1)',
                   border: '1px solid rgba(0, 245, 212, 0.25)',
+                  flexShrink: 0,
                 }}
               >
                 {badge}
@@ -115,6 +119,7 @@ export const MobileExperienceBar: React.FC<MobileExperienceBarProps> = ({
 
           {/* Small gesture/tracking indicator */}
           <span
+            className="mobile-bar-status"
             style={{
               fontFamily: 'var(--font-mono)',
               fontSize: '10px',
@@ -127,11 +132,13 @@ export const MobileExperienceBar: React.FC<MobileExperienceBarProps> = ({
               alignItems: 'center',
               gap: '4px',
               whiteSpace: 'nowrap',
+              overflow: 'hidden',
+              textOverflow: 'ellipsis',
             }}
           >
             <span
               className={`led-indicator ${gestureState.handDetected ? 'live' : isRunning ? 'warn' : 'standby'}`}
-              style={{ width: '5px', height: '5px' }}
+              style={{ width: '5px', height: '5px', flexShrink: 0 }}
             />
             {getTrackingLabel()}
           </span>
@@ -139,7 +146,7 @@ export const MobileExperienceBar: React.FC<MobileExperienceBarProps> = ({
       </div>
 
       {/* Right: Actions (Photo, Record, Extra, More/Settings) */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+      <div className="mobile-bar-right-actions" style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
         {extraControls}
 
         {/* Default visible: Photo & Record */}

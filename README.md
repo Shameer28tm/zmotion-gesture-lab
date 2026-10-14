@@ -7,7 +7,7 @@
 [![Vite](https://img.shields.io/badge/Vite-6-purple.svg)](https://vitejs.dev/)
 [![Three.js](https://img.shields.io/badge/Three.js-0.174-black.svg)](https://threejs.org/)
 [![MediaPipe](https://img.shields.io/badge/MediaPipe-Tasks_Vision-00d2ff.svg)](https://developers.google.com/mediapipe)
-[![Tests](https://img.shields.io/badge/Vitest-90%20Passed-success.svg)](https://vitest.dev/)
+[![Tests](https://img.shields.io/badge/Vitest-109%20Passed-success.svg)](https://vitest.dev/)
 [![CI](https://github.com/Shameer28tm/zmotion-gesture-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/Shameer28tm/zmotion-gesture-lab/actions/workflows/ci.yml)
 [![Privacy: 100% Client-Side](https://img.shields.io/badge/Privacy-100%25%20Client--Side-brightgreen.svg)](#100-user-side-privacy-guarantee)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
@@ -22,6 +22,27 @@
 * **Zero Remote Uploads**: Captured snapshots and recorded interaction videos are composited and encoded in-memory via client-side canvas and browser `MediaRecorder`.
 * **Zero Tracking / Telemetry**: No third-party trackers, no analytics beacons, and no storage of biometric or facial data.
 * **Full Privacy Architecture**: Read our complete disclosure in [`docs/privacy.md`](./docs/privacy.md).
+
+---
+
+## Dual-Hand Tracking & Vision Architecture
+
+### 1. Simultaneous Dual-Hand Detection & Skeleton Rendering
+* **MediaPipe `numHands: 2`**: Automatically infers and tracks both hands simultaneously when present in the camera viewport.
+* **`MultiHandTracker`**: Robust hand association engine maintaining continuous tracking state for up to two hands:
+  - **Safe Association Strategy**: Resolves MediaPipe's non-deterministic hand array ordering (`[0]` vs `[1]`) and handedness noise by matching detected hands to active tracks using Euclidean centroid proximity, trajectory projection, and soft handedness affinity.
+  - **Independent Grace Period**: When one hand disappears, a ~200ms grace period holds its skeleton before fading it out. *The remaining hand continues tracking and rendering seamlessly without stutter or identity swapping*.
+  - **Zero Contamination**: Each hand maintains independent smoothed landmark states; coordinates are never averaged across hands.
+* **`HandSkeletonRenderer` (`renderHands`)**:
+  - Renders 21 anatomical landmarks and canonical connections per hand.
+  - Color differentiation: **Electric Blue** (`#00d2ff`) for Left Hand / Hand 1, and **Electric Cyan** (`#00f5d4`) for Right Hand / Hand 2.
+  - Dynamic pinch connection highlight and wrist telemetry badges (`● L · GESTURE` / `● R · GESTURE`).
+  - High-performance Canvas 2D layer decoupled from React renders.
+
+### 2. Adaptive Velocity-Aware Landmark Filter (`LandmarkFilter`)
+* **Stationary Jitter Suppression**: Applies strong smoothing ($\alpha \approx 0.68$) during stationary poses to eliminate webcam sensor noise and landmark micro-jitter.
+* **Velocity-Aware Responsiveness**: Dynamically scales down smoothing alpha ($\alpha \approx 0.10$) during rapid hand movements, preventing trailing lag behind the physical hand.
+* **Zero-Jump Reacquisition**: Resets filter history on tracking loss; initial frame snaps directly to raw physical coordinates.
 
 ---
 
@@ -141,7 +162,7 @@ For complete architectural documentation and detailed Mermaid diagrams, consult:
 * **Computer Vision**: `@mediapipe/tasks-vision` (WebAssembly & WebGL delegate).
 * **Styling**: Vanilla CSS Design System with Cyber Glassmorphism (`#05070d`, `#080d1a`, `#00d2ff`, `#00f5d4`).
 * **Icons**: `lucide-react`.
-* **Testing & QA**: Vitest, JSDOM, `@testing-library/react` (90 passing automated tests across 11 test suites).
+* **Testing & QA**: Vitest, JSDOM, `@testing-library/react` (109 passing automated tests across 13 test suites).
 
 ---
 
@@ -169,7 +190,7 @@ Visit `http://localhost:5173` in your browser.
 
 ### Automated Testing
 ```bash
-# Run Vitest test suite (90 passing unit, integration, and regression tests)
+# Run Vitest test suite (109 passing unit, integration, and regression tests across 13 suites)
 npm test -- --run
 ```
 

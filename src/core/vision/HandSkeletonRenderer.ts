@@ -1,4 +1,10 @@
-import type { HandLandmarks, LandmarkPoint, GestureState } from '../types';
+import type {
+  HandLandmarks,
+  LandmarkPoint,
+  GestureState,
+  GestureType,
+  GestureMetrics,
+} from '../types';
 
 /**
  * Standard 21 MediaPipe Hand Landmark Canonical Connections
@@ -66,6 +72,15 @@ export function mapLandmarkToCanvas(
   };
 }
 
+export interface HandRenderItem {
+  landmarks: HandLandmarks;
+  gesture?: GestureType;
+  handedness?: 'Left' | 'Right' | 'Unknown';
+  metrics?: GestureMetrics;
+  id?: string;
+  isGracePeriod?: boolean;
+}
+
 export class HandSkeletonRenderer {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D | null;
@@ -97,6 +112,179 @@ export class HandSkeletonRenderer {
     this.ctx.restore();
   }
 
+  /**
+   * Renders multiple hand skeletons simultaneously on the canvas overlay.
+   */
+  public renderHands(
+    hands: HandRenderItem[],
+    containerWidth: number,
+    containerHeight: number,
+    videoWidth: number,
+    videoHeight: number
+  ): void {
+    if (!this.ctx) return;
+    this.clear();
+
+    const validHands = hands.filter(
+      (h) => h.landmarks && h.landmarks.length >= 21
+    );
+
+    if (validHands.length === 0 || containerWidth <= 0 || containerHeight <= 0) {
+      return;
+    }
+
+    const ctx = this.ctx;
+    ctx.save();
+    ctx.scale(this.dpr, this.dpr);
+
+    validHands.forEach((hand, handIndex) => {
+      ctx.save();
+
+      // Grace period subtle transparency (hand was briefly occluded, not fully lost yet)
+      if (hand.isGracePeriod) {
+        ctx.globalAlpha = 0.45;
+      }
+
+      // Map all 21 points to canvas space
+      const mapped = hand.landmarks.map((lm) =>
+        mapLandmarkToCanvas(lm, containerWidth, containerHeight, videoWidth, videoHeight)
+      );
+
+      const isPinching =
+        hand.gesture === 'PINCH' ||
+        (hand.metrics ? hand.metrics.pinchStrength > 0.35 : false);
+
+      // Color palette per hand: Hand 1 (or Left) = Electric Blue; Hand 2 (or Right) = Electric Cyan
+      const isRightHand = hand.handedness === 'Right' || handIndex === 1;
+      const primaryColor = isRightHand ? '#00f5d4' : '#00d2ff';
+      const lineColor = isRightHand ? 'rgba(0, 245, 212, 0.78)' : 'rgba(0, 210, 255, 0.78)';
+      const pinchColor = isRightHand ? '#00d2ff' : '#00f5d4';
+
+      // 1. Draw thin cyan/blue anatomical connecting lines
+      ctx.lineWidth = 2.2;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+      ctx.strokeStyle = lineColor;
+      ctx.shadowColor = primaryColor;
+      ctx.shadowBlur = 8;
+
+      ctx.beginPath();
+      for (const [startIdx, endIdx] of HAND_CONNECTIONS) {
+        const p1 = mapped[startIdx];
+        const p2 = mapped[endIdx];
+        if (p1 && p2) {
+          ctx.moveTo(p1.x, p1.y);
+          ctx.lineTo(p2.x, p2.y);
+        }
+      }
+      ctx.stroke();
+
+      // 2. Pinch connection highlight if engaged (Thumb tip 4 to Index tip 8)
+      if (isPinching && mapped[4] && mapped[8]) {
+        ctx.beginPath();
+        ctx.lineWidth = 3.2;
+        ctx.strokeStyle = pinchColor;
+        ctx.shadowColor = pinchColor;
+        ctx.shadowBlur = 12;
+        ctx.moveTo(mapped[4].x, mapped[4].y);
+        ctx.lineTo(mapped[8].x, mapped[8].y);
+        ctx.stroke();
+
+        // Pulsing pinch rings
+        for (const idx of [4, 8]) {
+          const pt = mapped[idx];
+          if (!pt) continue;
+          ctx.beginPath();
+          ctx.arc(pt.x, pt.y, 8, 0, Math.PI * 2);
+          ctx.strokeStyle = isRightHand ? 'rgba(0, 210, 255, 0.85)' : 'rgba(0, 245, 212, 0.85)';
+          ctx.lineWidth = 1.5;
+          ctx.stroke();
+        }
+      }
+
+      // 3. Small glowing landmark dots
+      for (let i = 0; i < mapped.length; i++) {
+        const pt = mapped[i];
+        if (!pt) continue;
+
+        const isTip = [4, 8, 12, 16, 20].includes(i);
+        const isWrist = i === 0;
+
+        ctx.beginPath();
+        let radius = 3.5;
+        let fillColor = '#ffffff';
+        let strokeColor = isRightHand ? 'rgba(0, 245, 212, 0.9)' : 'rgba(0, 210, 255, 0.9)';
+
+        if (isWrist) {
+          radius = 5.0;
+          fillColor = primaryColor;
+          strokeColor = '#ffffff';
+        } else if (isTip) {
+          radius = isPinching && (i === 4 || i === 8) ? 5.5 : 4.5;
+          fillColor = pinchColor;
+          strokeColor = '#ffffff';
+        }
+
+        ctx.arc(pt.x, pt.y, radius, 0, Math.PI * 2);
+        ctx.fillStyle = fillColor;
+        ctx.shadowColor = isTip ? pinchColor : primaryColor;
+        ctx.shadowBlur = 6;
+        ctx.fill();
+        ctx.lineWidth = 1.2;
+        ctx.strokeStyle = strokeColor;
+        ctx.stroke();
+      }
+
+      // 4. Restrained tracking indicator near the wrist
+      const wrist = mapped[0];
+      if (wrist) {
+        const labelX = Math.max(10, Math.min(containerWidth - 120, wrist.x - 50));
+        const labelY = Math.max(20, Math.min(containerHeight - 10, wrist.y + 24));
+
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = 'rgba(5, 7, 13, 0.82)';
+        ctx.strokeStyle = isRightHand ? 'rgba(0, 245, 212, 0.35)' : 'rgba(0, 210, 255, 0.35)';
+        ctx.lineWidth = 1;
+
+        const handLabel =
+          hand.handedness === 'Left'
+            ? 'L'
+            : hand.handedness === 'Right'
+            ? 'R'
+            : `#${handIndex + 1}`;
+
+        const text =
+          hand.gesture && hand.gesture !== 'NONE'
+            ? `● ${handLabel} · ${hand.gesture}`
+            : `● ${handLabel} · 21 PTS`;
+
+        ctx.font = '10px "JetBrains Mono", monospace';
+        const textMetrics = ctx.measureText(text);
+        const bgWidth = textMetrics.width + 12;
+        const bgHeight = 18;
+
+        ctx.beginPath();
+        if (typeof ctx.roundRect === 'function') {
+          ctx.roundRect(labelX, labelY - 12, bgWidth, bgHeight, 4);
+        } else {
+          ctx.rect(labelX, labelY - 12, bgWidth, bgHeight);
+        }
+        ctx.fill();
+        ctx.stroke();
+
+        ctx.fillStyle = primaryColor;
+        ctx.fillText(text, labelX + 6, labelY + 1);
+      }
+
+      ctx.restore();
+    });
+
+    ctx.restore();
+  }
+
+  /**
+   * Backwards-compatible single-hand render method.
+   */
   public render(
     landmarks: HandLandmarks | null,
     containerWidth: number,
@@ -105,134 +293,23 @@ export class HandSkeletonRenderer {
     videoHeight: number,
     gestureState?: GestureState
   ): void {
-    if (!this.ctx) return;
-    this.clear();
-
-    if (!landmarks || landmarks.length < 21 || containerWidth <= 0 || containerHeight <= 0) {
+    if (!landmarks || landmarks.length < 21) {
+      this.clear();
       return;
     }
-
-    const ctx = this.ctx;
-    ctx.save();
-    ctx.scale(this.dpr, this.dpr);
-
-    // Map all 21 points to canvas space
-    const mapped = landmarks.map((lm) =>
-      mapLandmarkToCanvas(lm, containerWidth, containerHeight, videoWidth, videoHeight)
+    this.renderHands(
+      [
+        {
+          landmarks,
+          gesture: gestureState?.activeGesture,
+          metrics: gestureState?.metrics,
+          handedness: gestureState?.handedness,
+        },
+      ],
+      containerWidth,
+      containerHeight,
+      videoWidth,
+      videoHeight
     );
-
-    const isPinching =
-      gestureState?.activeGesture === 'PINCH' ||
-      (gestureState?.metrics ? gestureState.metrics.pinchStrength > 0.35 : false);
-
-    // 1. Draw thin cyan/blue anatomical connecting lines
-    ctx.lineWidth = 2.2;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
-    ctx.strokeStyle = 'rgba(0, 210, 255, 0.78)';
-    ctx.shadowColor = '#00d2ff';
-    ctx.shadowBlur = 8;
-
-    ctx.beginPath();
-    for (const [startIdx, endIdx] of HAND_CONNECTIONS) {
-      const p1 = mapped[startIdx];
-      const p2 = mapped[endIdx];
-      if (p1 && p2) {
-        ctx.moveTo(p1.x, p1.y);
-        ctx.lineTo(p2.x, p2.y);
-      }
-    }
-    ctx.stroke();
-
-    // 2. Pinch connection highlight if engaged (Thumb tip 4 to Index tip 8)
-    if (isPinching && mapped[4] && mapped[8]) {
-      ctx.beginPath();
-      ctx.lineWidth = 3.2;
-      ctx.strokeStyle = '#00f5d4';
-      ctx.shadowColor = '#00f5d4';
-      ctx.shadowBlur = 12;
-      ctx.moveTo(mapped[4].x, mapped[4].y);
-      ctx.lineTo(mapped[8].x, mapped[8].y);
-      ctx.stroke();
-
-      // Pulsing pinch rings
-      for (const idx of [4, 8]) {
-        const pt = mapped[idx];
-        if (!pt) continue;
-        ctx.beginPath();
-        ctx.arc(pt.x, pt.y, 8, 0, Math.PI * 2);
-        ctx.strokeStyle = 'rgba(0, 245, 212, 0.85)';
-        ctx.lineWidth = 1.5;
-        ctx.stroke();
-      }
-    }
-
-    // 3. Small glowing landmark dots
-    for (let i = 0; i < mapped.length; i++) {
-      const pt = mapped[i];
-      if (!pt) continue;
-
-      const isTip = [4, 8, 12, 16, 20].includes(i);
-      const isWrist = i === 0;
-
-      ctx.beginPath();
-      let radius = 3.5;
-      let fillColor = '#ffffff';
-      let strokeColor = 'rgba(0, 210, 255, 0.9)';
-
-      if (isWrist) {
-        radius = 5.0;
-        fillColor = '#00d2ff';
-        strokeColor = '#ffffff';
-      } else if (isTip) {
-        radius = isPinching && (i === 4 || i === 8) ? 5.5 : 4.5;
-        fillColor = '#00f5d4';
-        strokeColor = '#ffffff';
-      }
-
-      ctx.arc(pt.x, pt.y, radius, 0, Math.PI * 2);
-      ctx.fillStyle = fillColor;
-      ctx.shadowColor = isTip ? '#00f5d4' : '#00d2ff';
-      ctx.shadowBlur = 6;
-      ctx.fill();
-      ctx.lineWidth = 1.2;
-      ctx.strokeStyle = strokeColor;
-      ctx.stroke();
-    }
-
-    // 4. Restrained tracking indicator near the wrist
-    const wrist = mapped[0];
-    if (wrist) {
-      const labelX = Math.max(10, Math.min(containerWidth - 110, wrist.x - 45));
-      const labelY = Math.max(20, Math.min(containerHeight - 10, wrist.y + 24));
-
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = 'rgba(5, 7, 13, 0.8)';
-      ctx.strokeStyle = 'rgba(0, 210, 255, 0.35)';
-      ctx.lineWidth = 1;
-
-      const text =
-        gestureState?.activeGesture && gestureState.activeGesture !== 'NONE'
-          ? `● ${gestureState.activeGesture}`
-          : '● 21 LANDMARKS';
-      ctx.font = '10px "JetBrains Mono", monospace';
-      const textMetrics = ctx.measureText(text);
-      const bgWidth = textMetrics.width + 12;
-      const bgHeight = 18;
-
-      ctx.beginPath();
-      if (typeof ctx.roundRect === 'function') {
-        ctx.roundRect(labelX, labelY - 12, bgWidth, bgHeight, 4);
-      } else {
-        ctx.rect(labelX, labelY - 12, bgWidth, bgHeight);
-      }
-      ctx.fill();
-      ctx.stroke();
-
-      ctx.fillStyle = isPinching ? '#00f5d4' : 'var(--electric-cyan, #00d2ff)';
-      ctx.fillText(text, labelX + 6, labelY + 1);
-    }
-
-    ctx.restore();
   }
 }

@@ -337,6 +337,10 @@
 @media (max-height: 520px) and (orientation: landscape) {
   .hud-overlay {
     padding: 6px 10px;
+    padding-top: max(6px, env(safe-area-inset-top, 6px));
+    padding-bottom: max(6px, env(safe-area-inset-bottom, 6px));
+    padding-left: max(10px, env(safe-area-inset-left, 10px));
+    padding-right: max(10px, env(safe-area-inset-right, 10px));
   }
   .mobile-experience-bar {
     padding: 4px 8px;
@@ -345,3 +349,79 @@
     padding: 4px 8px;
   }
 }
+
+/* Narrow & Ultra-Compact Mobile Screens (320px, 360px, 375px) */
+@media (max-width: 380px) {
+  .hud-overlay {
+    padding: 8px;
+    padding-top: max(8px, env(safe-area-inset-top, 8px));
+    padding-bottom: max(8px, env(safe-area-inset-bottom, 8px));
+    padding-left: max(8px, env(safe-area-inset-left, 8px));
+    padding-right: max(8px, env(safe-area-inset-right, 8px));
+  }
+
+  .mobile-experience-bar {
+    padding: 6px 8px !important;
+    gap: 4px !important;
+  }
+
+  .mobile-bar-left {
+    gap: 5px !important;
+  }
+
+  .mobile-bar-title {
+    font-size: 11px !important;
+  }
+
+  .mobile-bar-badge {
+    display: none !important;
+  }
+
+  .mobile-bar-right-actions {
+    gap: 4px !important;
+  }
+
+  .mobile-runner-bar {
+    gap: 4px !important;
+  }
+
+  .mobile-runner-bar .btn {
+    padding: 6px 4px !important;
+    font-size: 11px !important;
+    min-height: 40px !important;
+  }
+}
+
+/* Touch optimization: Instant tap response on mobile HUD controls */
+.hud-interactive button,
+.hud-interactive .btn,
+.mobile-runner-bar button,
+.mobile-experience-bar button {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* User Motion Preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+
+  .scene-placeholder-grid {
+    animation: none !important;
+  }
+
+  .mobile-drawer-sheet {
+    animation: none !important;
+  }
+
+  .led-indicator.live {
+    animation: none !important;
+  }
+}
+

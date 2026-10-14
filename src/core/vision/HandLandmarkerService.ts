@@ -10,6 +10,7 @@ const WASM_CDN_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.
 export interface HandLandmarkerConfig {
   detectionConfidence?: number;
   trackingConfidence?: number;
+  numHands?: number;
 }
 
 export class HandLandmarkerService {
@@ -30,6 +31,7 @@ export class HandLandmarkerService {
 
     const detectionConf = config.detectionConfidence ?? 0.45;
     const trackingConf = config.trackingConfidence ?? 0.40;
+    const numHands = config.numHands ?? 2;
 
     const maxRetries = 2;
     let attempt = 0;
@@ -53,7 +55,7 @@ export class HandLandmarkerService {
               delegate: 'GPU',
             },
             runningMode: 'VIDEO',
-            numHands: 1,
+            numHands,
             minHandDetectionConfidence: detectionConf,
             minHandPresenceConfidence: detectionConf,
             minTrackingConfidence: trackingConf,
@@ -67,7 +69,7 @@ export class HandLandmarkerService {
               delegate: 'CPU',
             },
             runningMode: 'VIDEO',
-            numHands: 1,
+            numHands,
             minHandDetectionConfidence: detectionConf,
             minHandPresenceConfidence: detectionConf,
             minTrackingConfidence: trackingConf,

@@ -48,15 +48,28 @@ For the visual topology diagram, see [System Architecture Diagram](./diagrams/sy
 
 ### 2.1 MediaPipe Tasks Vision Configuration
 - **Model Asset**: `hand_landmarker.task` loaded from Google's static CDN.
-- **Delegate**: WebAssembly (`CPU` delegate for broad compatibility; hardware accelerated via SIMD when available).
-- **Running Mode**: `VIDEO`. Frames are supplied using monotonic timestamps (`performance.now()`), avoiding frame drops or timestamp collisions.
-- **Detection Bounds**: `numHands: 1` (configured for low-latency single-hand spatial control), `minHandDetectionConfidence: 0.5`, `minHandPresenceConfidence: 0.5`, `minTrackingConfidence: 0.5`.
+- **Delegate**: GPU delegate attempted first for high FPS, seamlessly falling back to CPU if WebGL/GLES is constrained.
+- **Running Mode**: `VIDEO`. Frames are supplied using strictly monotonic timestamps (`performance.now()`), avoiding frame drops or timestamp collisions.
+- **Detection Bounds**: `numHands: 2` (configured to detect and track both hands simultaneously), `minHandDetectionConfidence: 0.45`, `minHandPresenceConfidence: 0.45`, `minTrackingConfidence: 0.40`.
 
-### 2.2 Gesture Classification & Smoothing
-- **Exponential Smoothing**: Landmark coordinates are filtered using an exponential moving average (`alpha = 0.35`) to prevent high-frequency jitter while preserving immediate responsiveness.
-- **Palm Normalization**: Distances between landmarks (such as thumb tip #4 and index tip #8) are normalized against palm span (distance between wrist #0 and middle MCP #9). This ensures gestures are invariant to hand distance from the lens.
-- **Pinch Detection**: Continuous pinch scale is computed between normalized bounds ($[0.15, 0.70]$), with curled-finger checks preventing false pinches when making a fist or resting on the chin.
-- **Fist & Jump Latching**: Strict state machines require a full fist clench to trigger a jump or shape morph, requiring an open-palm release before a subsequent trigger can register.
+### 2.2 Multi-Hand Tracking & Safe Association Strategy (`MultiHandTracker`)
+- **API Limitations**:
+  - The MediaPipe Tasks Vision Web API does not output persistent track IDs across consecutive video frames.
+  - Hand array ordering (`landmarks[0]` vs `landmarks[1]`) is non-deterministic between frames.
+  - Handedness classification can momentarily fluctuate when hands cross, overlap, or orient obliquely.
+- **Safe Association Algorithm**:
+  - `MultiHandTracker` maintains stable internal slots (`hand-1`, `hand-2`) and performs an optimal bipartite matching between incoming detections and active slots.
+  - Matching cost is driven primarily by 3D Euclidean palm-center proximity, augmented by velocity vector extrapolation to predict position when hands sweep across each other.
+  - Soft handedness affinity weighting penalizes cross-handedness matching without locking into noisy labels.
+- **Independent Grace Periods**:
+  - When one hand disappears or is briefly occluded by motion blur, an independent 200ms grace period holds that hand's smoothed coordinates.
+  - If the hand does not return within 200ms, only that hand's skeleton is cleared.
+  - The other hand remains tracked and actively rendered without stutter, position jumps, or identity swapping.
+- **Adaptive Velocity-Aware Landmark Filter (`LandmarkFilter`)**:
+  - Each tracked hand maintains an isolated `LandmarkFilter` instance (guaranteeing Hand 1 and Hand 2 are never averaged together).
+  - During stationary poses ($v \le 0.10$ units/sec), high smoothing ($\alpha \approx 0.68$) completely damps webcam sensor jitter.
+  - During rapid motion ($v \ge 0.75$ units/sec), smoothing dynamically drops ($\alpha \approx 0.10$), eliminating visual lag behind the physical hand.
+  - Filter history resets cleanly on tracking loss, allowing instantaneous zero-jump reacquisition.
 
 ---
 
