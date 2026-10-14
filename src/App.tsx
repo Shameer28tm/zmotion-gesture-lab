@@ -20,9 +20,6 @@ const GestureRunner = lazy(() =>
     default: m.GestureRunner,
   }))
 );
-const AboutExperience = lazy(() =>
-  import('./experiences/about/AboutExperience').then((m) => ({ default: m.AboutExperience }))
-);
 
 const RouteLoadingFallback: React.FC<{ title: string }> = ({ title }) => (
   <div
@@ -57,11 +54,17 @@ export const AppContent: React.FC = () => {
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
 
   // Sync hash routing for shareability and browser back/forward navigation
+  // Safely redirects unknown or obsolete hash routes (e.g. #about) to home
   useEffect(() => {
     const handleHashChange = () => {
       const hash = window.location.hash.replace('#', '') as ExperienceRoute;
-      if (['home', 'studio', 'particles', 'runner', 'about'].includes(hash)) {
+      if (['studio', 'particles', 'runner'].includes(hash)) {
         setCurrentRoute(hash);
+      } else {
+        setCurrentRoute('home');
+        if (window.location.hash && window.location.hash !== '#' && window.location.hash !== '#home') {
+          window.location.hash = '';
+        }
       }
     };
 
@@ -97,12 +100,6 @@ export const AppContent: React.FC = () => {
         return (
           <Suspense fallback={<RouteLoadingFallback title="Gesture Runner" />}>
             <GestureRunner />
-          </Suspense>
-        );
-      case 'about':
-        return (
-          <Suspense fallback={<RouteLoadingFallback title="Technical Specification" />}>
-            <AboutExperience />
           </Suspense>
         );
       case 'home':

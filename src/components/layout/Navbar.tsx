@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Box, Sparkles, Gamepad2, Info, Menu, X, Activity, HelpCircle } from 'lucide-react';
+import { Box, Sparkles, Gamepad2, Menu, X, Activity, HelpCircle } from 'lucide-react';
 import { type ExperienceRoute, NAV_ITEMS } from '../../types/navigation';
 import { Button } from '../ui/Button';
 import { Badge } from '../ui/Badge';
@@ -25,8 +25,6 @@ export const Navbar: React.FC<NavbarProps> = ({
         return <Sparkles size={16} />;
       case 'runner':
         return <Gamepad2 size={16} />;
-      case 'about':
-        return <Info size={16} />;
       default:
         return <Activity size={16} />;
     }

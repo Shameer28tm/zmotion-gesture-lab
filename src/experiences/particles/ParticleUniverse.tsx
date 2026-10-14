@@ -27,6 +27,8 @@ import {
 } from './particleMath';
 import { CameraBackdrop } from '../../components/camera/CameraBackdrop';
 import { CaptureControls } from '../../components/capture/CaptureControls';
+import { MobileExperienceBar } from '../../components/hud/MobileExperienceBar';
+import { MobileControlDrawer } from '../../components/hud/MobileControlDrawer';
 import '../../styles/hud.css';
 
 export const ParticleUniverse: React.FC = () => {
@@ -41,6 +43,7 @@ export const ParticleUniverse: React.FC = () => {
   const [isPaused, setIsPaused] = useState(false);
   const [expansion, setExpansion] = useState(1.0);
   const [controlMode, setControlMode] = useState<'GESTURE' | 'MANUAL'>('MANUAL');
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   // Initialize and mount Three.js Particle Scene Controller
   useEffect(() => {
@@ -197,6 +200,14 @@ export const ParticleUniverse: React.FC = () => {
 
       {/* Cyberpunk Telemetry HUD Overlay */}
       <div className="hud-overlay">
+        {/* Compact Mobile Top Bar (Visible on mobile screens <= 768px) */}
+        <MobileExperienceBar
+          title="Particle Universe"
+          badge={`${particleCount >= 1000 ? `${particleCount / 1000}K` : particleCount}`}
+          canvasContainerRef={canvasContainerRef}
+          onOpenDrawer={() => setIsDrawerOpen(true)}
+        />
+
         {/* Top Telemetry */}
         <header className="hud-top-bar hud-interactive">
           <div className="hud-title-card">
@@ -472,6 +483,144 @@ export const ParticleUniverse: React.FC = () => {
           </aside>
         </div>
       </div>
+
+      {/* Mobile Collapsible Advanced Controls Drawer */}
+      <MobileControlDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        title="Particle Universe Controls"
+        badge={currentShape.toUpperCase()}
+      >
+        {/* Shape Presets */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)' }}>
+            PARAMETRIC CONSTRUCTS (FIST TRIGGER)
+          </span>
+          <div
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: '6px' }}
+            role="radiogroup"
+            aria-label="Mobile preset shape selection"
+          >
+            {shapes.map((s, idx) => {
+              const isActive = currentShape === s;
+              return (
+                <button
+                  key={s}
+                  role="radio"
+                  aria-checked={isActive}
+                  onClick={() => handleSelectShape(s)}
+                  style={{
+                    padding: '10px 4px',
+                    borderRadius: '8px',
+                    border: '1px solid',
+                    borderColor: isActive ? 'var(--electric-cyan)' : 'var(--border-subtle)',
+                    background: isActive ? 'rgba(0, 245, 212, 0.2)' : 'rgba(255, 255, 255, 0.03)',
+                    color: isActive ? '#fff' : 'var(--text-secondary)',
+                    fontFamily: 'var(--font-mono)',
+                    fontSize: '10px',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    gap: '4px',
+                    textTransform: 'uppercase',
+                  }}
+                  title={`Select ${s} (Key ${idx + 1})`}
+                >
+                  {getShapeIcon(s)}
+                  <span>{s}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Morph, Pause & Reset */}
+        <div style={{ display: 'flex', gap: '8px' }}>
+          <Button
+            variant="primary"
+            size="md"
+            icon={<FastForward size={15} />}
+            onClick={handleNextShape}
+            style={{ flex: 1 }}
+          >
+            Next Morph
+          </Button>
+          <Button
+            variant="outline"
+            size="md"
+            icon={isPaused ? <Play size={15} /> : <Pause size={15} />}
+            onClick={handleTogglePause}
+          >
+            {isPaused ? 'Resume' : 'Pause'}
+          </Button>
+          <Button
+            variant="glass"
+            size="md"
+            icon={<RotateCcw size={15} />}
+            onClick={handleResetScene}
+          >
+            Reset
+          </Button>
+        </div>
+
+        {/* Radial Expansion */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)' }}>
+              RADIAL EXPANSION (PINCH GESTURE)
+            </span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--electric-cyan)', fontWeight: 700 }}>
+              {expansion.toFixed(2)}x
+            </span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <Button
+              variant="outline"
+              size="md"
+              icon={<ZoomOut size={15} />}
+              onClick={() => handleExpansionStep(-0.2)}
+              disabled={expansion <= DEFAULT_PARTICLE_CONFIG.minScale}
+            >
+              Contract
+            </Button>
+            <Button
+              variant="outline"
+              size="md"
+              icon={<ZoomIn size={15} />}
+              onClick={() => handleExpansionStep(0.2)}
+              disabled={expansion >= DEFAULT_PARTICLE_CONFIG.maxScale}
+            >
+              Expand
+            </Button>
+          </div>
+        </div>
+
+        {/* GPU Density Tier */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)' }}>
+            GPU PARTICLE DENSITY TIER
+          </span>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+            {[5000, 15000, 30000].map((count) => (
+              <Button
+                key={count}
+                variant={particleCount === count ? 'primary' : 'outline'}
+                size="md"
+                onClick={() => setParticleCount(count)}
+              >
+                {count >= 1000 ? `${count / 1000}K` : count}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        {/* Vision Diagnostics and Controls */}
+        <ControlCenter
+          activeExperienceTitle="Particle Universe"
+          onResetScene={handleResetScene}
+        />
+      </MobileControlDrawer>
     </div>
   );
 };

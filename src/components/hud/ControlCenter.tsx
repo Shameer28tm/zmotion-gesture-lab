@@ -35,10 +35,11 @@ export const ControlCenter: React.FC<ControlCenterProps> = ({
     stopEngine,
     setSensitivity,
     setSmoothing,
+    showSkeleton,
+    setShowSkeleton,
     engine,
   } = useGestureEngine();
 
-  const [landmarksVisible, setLandmarksVisible] = useState(true);
   const [expanded, setExpanded] = useState(false);
   const config = engine.getConfig();
 
@@ -378,18 +379,18 @@ export const ControlCenter: React.FC<ControlCenterProps> = ({
               }}
             >
               <span style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Layers size={14} /> Show 21 Landmarks
+                <Layers size={14} /> Show Hand Skeleton
               </span>
               <Button
                 variant="outline"
                 size="sm"
-                onClick={() => setLandmarksVisible(!landmarksVisible)}
+                onClick={() => setShowSkeleton(!showSkeleton)}
                 style={{
                   padding: '4px 8px',
-                  color: landmarksVisible ? 'var(--electric-cyan)' : 'var(--text-muted)',
+                  color: showSkeleton ? 'var(--electric-cyan)' : 'var(--text-muted)',
                 }}
               >
-                {landmarksVisible ? 'Enabled' : 'Disabled'}
+                {showSkeleton ? 'Enabled' : 'Disabled'}
               </Button>
             </div>
           )}

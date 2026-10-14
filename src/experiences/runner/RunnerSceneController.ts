@@ -320,9 +320,49 @@ export class RunnerSceneController {
 
     // Clean up obstacle meshes
     for (const mesh of this.obstacleMeshes.values()) {
+      if ('geometry' in mesh && mesh.geometry) {
+        mesh.geometry.dispose();
+      }
       this.scene?.remove(mesh);
     }
     this.obstacleMeshes.clear();
+
+    // Clean up track group children
+    this.trackGroup.traverse((child) => {
+      const m = child as Mesh;
+      if (m.isMesh) {
+        m.geometry?.dispose();
+        if (Array.isArray(m.material)) {
+          m.material.forEach((mat) => mat.dispose());
+        } else if (m.material) {
+          m.material.dispose();
+        }
+      }
+    });
+    this.trackGroup.clear();
+    this.trackLines = [];
+
+    // Clean up player group children
+    this.playerGroup.traverse((child) => {
+      const m = child as Mesh;
+      if (m.isMesh) {
+        m.geometry?.dispose();
+        if (Array.isArray(m.material)) {
+          m.material.forEach((mat) => mat.dispose());
+        } else if (m.material) {
+          m.material.dispose();
+        }
+      }
+    });
+    this.playerGroup.clear();
+
+    if (this.thrusterParticles) {
+      this.thrusterParticles.geometry?.dispose();
+      if (this.thrusterParticles.material) {
+        (this.thrusterParticles.material as PointsMaterial).dispose();
+      }
+      this.thrusterParticles = null;
+    }
 
     if (this.renderer) {
       const canvas = this.renderer.domElement;

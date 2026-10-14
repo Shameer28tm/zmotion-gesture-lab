@@ -72,6 +72,47 @@ export const HomeLanding: React.FC<HomeLandingProps> = ({ onNavigate }) => {
             Leverage Early. Move Differently. Sky Is the Limit.
           </div>
 
+          {/* Aesthetic Editorial Developer Credit */}
+          <div
+            className="developer-credit-tag"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '6px',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '12px',
+              letterSpacing: '0.04em',
+              color: 'var(--text-muted)',
+              marginTop: '-4px',
+            }}
+          >
+            <span>Developed by</span>
+            <a
+              href="https://www.linkedin.com/in/shameerion"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Developer LinkedIn Profile: Shameer TM (opens in new tab)"
+              style={{
+                color: '#ffffff',
+                textDecoration: 'none',
+                fontWeight: 600,
+                borderBottom: '1px solid rgba(0, 210, 255, 0.4)',
+                paddingBottom: '1px',
+                transition: 'all var(--transition-fast)',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = 'var(--electric-cyan)';
+                e.currentTarget.style.borderBottomColor = 'var(--electric-cyan)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = '#ffffff';
+                e.currentTarget.style.borderBottomColor = 'rgba(0, 210, 255, 0.4)';
+              }}
+            >
+              Shameer TM
+            </a>
+          </div>
+
           {/* Exact Required H1 Under 75 Characters */}
           <h1
             style={{

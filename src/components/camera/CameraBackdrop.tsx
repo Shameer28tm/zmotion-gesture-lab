@@ -1,5 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 import { useGestureEngine } from '../../core/engine/GestureContext';
+import { HandSkeletonOverlay } from './HandSkeletonOverlay';
 
 export interface CameraBackdropProps {
   className?: string;
@@ -8,7 +9,7 @@ export interface CameraBackdropProps {
 
 export const CameraBackdrop: React.FC<CameraBackdropProps> = ({ className = '', style }) => {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const { engine, isRunning } = useGestureEngine();
+  const { engine, isRunning, showSkeleton } = useGestureEngine();
 
   useEffect(() => {
     if (!containerRef.current) return;
@@ -29,6 +30,7 @@ export const CameraBackdrop: React.FC<CameraBackdropProps> = ({ className = '', 
       aria-hidden="true"
     >
       {isRunning && <div className="camera-vignette-overlay" />}
+      <HandSkeletonOverlay containerRef={containerRef} isVisible={isRunning && showSkeleton} />
     </div>
   );
 };

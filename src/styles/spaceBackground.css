@@ -217,3 +217,14 @@
     opacity: 0.25;
   }
 }
+
+/* Accessibility: Respect Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+  .cosmic-stars-distant,
+  .cosmic-stars-bright,
+  .cosmic-planet-primary,
+  .cosmic-moon,
+  .cosmic-shooting-star {
+    animation: none !important;
+  }
+}

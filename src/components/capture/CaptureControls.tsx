@@ -8,11 +8,13 @@ import { useGestureEngine } from '../../core/engine/GestureContext';
 export interface CaptureControlsProps {
   canvasContainerRef: React.RefObject<HTMLDivElement | null>;
   className?: string;
+  compact?: boolean;
 }
 
 export const CaptureControls: React.FC<CaptureControlsProps> = ({
   canvasContainerRef,
   className = '',
+  compact = false,
 }) => {
   const { engine } = useGestureEngine();
   const captureService = MediaCaptureService.getInstance();
@@ -107,7 +109,7 @@ export const CaptureControls: React.FC<CaptureControlsProps> = ({
         style={{
           display: 'flex',
           alignItems: 'center',
-          gap: '8px',
+          gap: compact ? '6px' : '8px',
         }}
       >
         <Button
@@ -117,8 +119,9 @@ export const CaptureControls: React.FC<CaptureControlsProps> = ({
           onClick={handleCapturePhoto}
           disabled={isCapturingPhoto || isRecording}
           title="Capture Snapshot (100% Client-Side Privacy)"
+          style={compact ? { padding: '6px 10px', minHeight: '36px' } : {}}
         >
-          PHOTO
+          {compact ? '' : 'PHOTO'}
         </Button>
 
         <Button
@@ -128,9 +131,12 @@ export const CaptureControls: React.FC<CaptureControlsProps> = ({
           icon={isRecording ? <Square size={13} /> : <Video size={13} />}
           onClick={handleToggleRecord}
           title={isRecording ? 'Stop Recording' : 'Record Short Video (100% Client-Side Privacy)'}
-          style={isRecording ? { background: '#ff3366', color: '#fff', borderColor: '#ff3366' } : {}}
+          style={{
+            ...(compact ? { padding: '6px 10px', minHeight: '36px' } : {}),
+            ...(isRecording ? { background: '#ff3366', color: '#fff', borderColor: '#ff3366' } : {}),
+          }}
         >
-          {isRecording ? `REC ${recordSeconds}s` : 'RECORD'}
+          {compact ? (isRecording ? `${recordSeconds}s` : '') : isRecording ? `REC ${recordSeconds}s` : 'RECORD'}
         </Button>
       </div>
 

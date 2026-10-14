@@ -22,6 +22,8 @@ import {
 } from './StudioSceneController';
 import { CameraBackdrop } from '../../components/camera/CameraBackdrop';
 import { CaptureControls } from '../../components/capture/CaptureControls';
+import { MobileExperienceBar } from '../../components/hud/MobileExperienceBar';
+import { MobileControlDrawer } from '../../components/hud/MobileControlDrawer';
 import '../../styles/hud.css';
 
 export const GestureStudio: React.FC = () => {
@@ -35,6 +37,7 @@ export const GestureStudio: React.FC = () => {
   const [currentColor, setCurrentColor] = useState('#00d2ff');
   const [wireframeOnly, setWireframeOnly] = useState(false);
   const [controlMode, setControlMode] = useState<StudioControlMode>('MANUAL');
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   const palette = ['#00d2ff', '#00f5d4', '#c084fc', '#ff00aa', '#ffaa00', '#ffffff'];
 
@@ -174,7 +177,15 @@ export const GestureStudio: React.FC = () => {
 
       {/* Laboratory HUD Overlay */}
       <div className="hud-overlay">
-        {/* Top Telemetry Bar */}
+        {/* Compact Mobile Top Bar (Visible on mobile screens <= 768px) */}
+        <MobileExperienceBar
+          title="Gesture Studio"
+          badge="3D Mesh"
+          canvasContainerRef={canvasContainerRef}
+          onOpenDrawer={() => setIsDrawerOpen(true)}
+        />
+
+        {/* Desktop Top Telemetry Bar (Visible on desktop > 768px) */}
         <header className="hud-top-bar hud-interactive">
           <div className="hud-title-card">
             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
@@ -276,6 +287,7 @@ export const GestureStudio: React.FC = () => {
 
         {/* Ambient Interaction Hints Bar */}
         <div
+          className="hud-hints-bar"
           style={{
             alignSelf: 'center',
             background: 'rgba(8, 13, 26, 0.75)',
@@ -480,6 +492,132 @@ export const GestureStudio: React.FC = () => {
           </section>
         </footer>
       </div>
+
+      {/* Mobile Collapsible Advanced Controls Drawer */}
+      <MobileControlDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        title="Gesture Studio Controls"
+        badge={selectedShape.toUpperCase()}
+      >
+        {/* Shape Presets */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)' }}>
+            CONSTRUCT SELECTION
+          </span>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+            <Button
+              variant={selectedShape === 'sphere' ? 'primary' : 'glass'}
+              size="md"
+              icon={<Circle size={15} />}
+              onClick={() => handleSelectShape('sphere')}
+              aria-pressed={selectedShape === 'sphere'}
+            >
+              Sphere
+            </Button>
+            <Button
+              variant={selectedShape === 'cube' ? 'primary' : 'glass'}
+              size="md"
+              icon={<Box size={15} />}
+              onClick={() => handleSelectShape('cube')}
+              aria-pressed={selectedShape === 'cube'}
+            >
+              Cube
+            </Button>
+            <Button
+              variant={selectedShape === 'torus' ? 'primary' : 'glass'}
+              size="md"
+              icon={<Disc size={15} />}
+              onClick={() => handleSelectShape('torus')}
+              aria-pressed={selectedShape === 'torus'}
+            >
+              Torus
+            </Button>
+          </div>
+        </div>
+
+        {/* Color Palette */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)' }}>
+            EMISSIVE ACCENT COLOR
+          </span>
+          <div style={{ display: 'flex', gap: '12px', justifyContent: 'center' }} role="group" aria-label="Color Swatches">
+            {palette.map((c) => (
+              <button
+                key={c}
+                onClick={() => handleSelectColor(c)}
+                aria-label={`Select color ${c}`}
+                style={{
+                  width: '32px',
+                  height: '32px',
+                  borderRadius: '50%',
+                  backgroundColor: c,
+                  border: currentColor === c ? '3px solid #ffffff' : '1px solid rgba(255,255,255,0.25)',
+                  boxShadow: currentColor === c ? `0 0 12px ${c}` : 'none',
+                  cursor: 'pointer',
+                  padding: 0,
+                  transition: 'transform 0.15s ease',
+                  transform: currentColor === c ? 'scale(1.15)' : 'scale(1)',
+                }}
+              />
+            ))}
+          </div>
+        </div>
+
+        {/* Manual Scale & Wireframe */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)' }}>
+              SCALE & MESH STRUCTURE
+            </span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '12px', color: 'var(--electric-cyan)', fontWeight: 700 }}>
+              {scaleFactor.toFixed(2)}x
+            </span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <Button
+              variant="outline"
+              size="md"
+              icon={<ZoomOut size={15} />}
+              onClick={() => handleZoom(-0.2)}
+            >
+              Scale -
+            </Button>
+            <Button
+              variant="outline"
+              size="md"
+              icon={<ZoomIn size={15} />}
+              onClick={() => handleZoom(0.2)}
+            >
+              Scale +
+            </Button>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: '8px' }}>
+            <Button
+              variant={wireframeOnly ? 'primary' : 'outline'}
+              size="md"
+              onClick={handleToggleWireframe}
+            >
+              {wireframeOnly ? 'Wireframe Only' : 'Solid Shell'}
+            </Button>
+            <Button
+              variant="glass"
+              size="md"
+              icon={<RotateCcw size={15} />}
+              onClick={handleResetScene}
+            >
+              Reset
+            </Button>
+          </div>
+        </div>
+
+        {/* Control Center & Vision Diagnostics */}
+        <ControlCenter
+          activeExperienceTitle="Gesture Studio"
+          onResetScene={handleResetScene}
+          showOverlayToggle={cameraStatus === 'streaming'}
+        />
+      </MobileControlDrawer>
     </div>
   );
 };

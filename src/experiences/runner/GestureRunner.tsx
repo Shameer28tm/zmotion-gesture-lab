@@ -19,6 +19,8 @@ import { RunnerEngine, type RunnerGameState, type RunnerDifficulty } from './run
 import { RunnerSceneController } from './RunnerSceneController';
 import { CameraBackdrop } from '../../components/camera/CameraBackdrop';
 import { CaptureControls } from '../../components/capture/CaptureControls';
+import { MobileExperienceBar } from '../../components/hud/MobileExperienceBar';
+import { MobileControlDrawer } from '../../components/hud/MobileControlDrawer';
 import '../../styles/hud.css';
 
 export const GestureRunner: React.FC = () => {
@@ -39,6 +41,7 @@ export const GestureRunner: React.FC = () => {
   const [speed, setSpeed] = useState(14);
   const [multiplier, setMultiplier] = useState(1.0);
   const [isNewRecord, setIsNewRecord] = useState(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
 
   // Initialize Scene Controller & Game Loop
   useEffect(() => {
@@ -242,6 +245,34 @@ export const GestureRunner: React.FC = () => {
 
       {/* Cyberpunk Telemetry HUD Overlay */}
       <div className="hud-overlay">
+        {/* Compact Mobile Top Bar (Visible on mobile screens <= 768px) */}
+        <MobileExperienceBar
+          title="Gesture Runner"
+          badge={difficulty}
+          canvasContainerRef={canvasContainerRef}
+          onOpenDrawer={() => setIsDrawerOpen(true)}
+          extraControls={
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '4px',
+                fontFamily: 'var(--font-mono)',
+                fontSize: '11px',
+                background: 'rgba(0, 210, 255, 0.1)',
+                padding: '4px 8px',
+                borderRadius: '6px',
+                border: '1px solid rgba(0, 210, 255, 0.25)',
+              }}
+            >
+              <span style={{ color: 'var(--text-muted)' }}>SCR</span>
+              <span style={{ color: 'var(--electric-cyan)', fontWeight: 700 }}>
+                {score}
+              </span>
+            </div>
+          }
+        />
+
         {/* Top Telemetry Bar */}
         <header className="hud-top-bar hud-interactive">
           <div className="hud-title-card">
@@ -764,7 +795,130 @@ export const GestureRunner: React.FC = () => {
             />
           </aside>
         </div>
+
+        {/* Mobile Ergonomic Touch Runner Bar (Visible on mobile screens <= 768px) */}
+        <div className="mobile-runner-bar hud-interactive">
+          <Button
+            variant={gameState === 'PLAYING' ? 'outline' : 'primary'}
+            size="md"
+            icon={gameState === 'PLAYING' ? <Pause size={15} /> : <Play size={15} />}
+            onClick={gameState === 'PLAYING' ? handlePauseToggle : handleStartGame}
+            style={{ minHeight: '44px', padding: '8px 12px' }}
+          >
+            {gameState === 'PLAYING' ? 'Pause' : 'Start'}
+          </Button>
+
+          <div style={{ display: 'flex', gap: '6px', flex: 1, maxWidth: '280px' }}>
+            <Button
+              variant="outline"
+              size="md"
+              icon={<ArrowLeft size={16} />}
+              onClick={() => engineRef.current.moveLeft()}
+              style={{ flex: 1, minHeight: '44px' }}
+              aria-label="Move Lane Left"
+            >
+              Left
+            </Button>
+            <Button
+              variant="primary"
+              size="md"
+              glow
+              icon={<ArrowUp size={16} />}
+              onClick={() => engineRef.current.jump()}
+              style={{ flex: 1, minHeight: '44px' }}
+              aria-label="Jump Over Obstacle"
+            >
+              Jump
+            </Button>
+            <Button
+              variant="outline"
+              size="md"
+              icon={<ArrowRight size={16} />}
+              onClick={() => engineRef.current.moveRight()}
+              style={{ flex: 1, minHeight: '44px' }}
+              aria-label="Move Lane Right"
+            >
+              Right
+            </Button>
+          </div>
+        </div>
       </div>
+
+      {/* Mobile Collapsible Advanced Controls Drawer */}
+      <MobileControlDrawer
+        isOpen={isDrawerOpen}
+        onClose={() => setIsDrawerOpen(false)}
+        title="Gesture Runner Settings"
+        badge={difficulty}
+      >
+        {/* Difficulty Selection */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)' }}>
+            GAME DIFFICULTY
+          </span>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '8px' }}>
+            {(['EASY', 'NORMAL', 'HARD'] as RunnerDifficulty[]).map((d) => (
+              <Button
+                key={d}
+                variant={difficulty === d ? 'primary' : 'outline'}
+                size="md"
+                onClick={() => handleSelectDifficulty(d)}
+              >
+                {d} {d === 'EASY' && '★'}
+              </Button>
+            ))}
+          </div>
+        </div>
+
+        {/* Game Telemetry Stats */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)' }}>
+            RUNNER TELEMETRY & STATS
+          </span>
+          <div
+            style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr 1fr',
+              gap: '8px',
+              fontFamily: 'var(--font-mono)',
+              fontSize: '11px',
+            }}
+          >
+            <div style={{ padding: '8px', background: 'rgba(0,0,0,0.3)', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: '9px' }}>DISTANCE</span>
+              <div style={{ fontWeight: 700, color: '#fff', fontSize: '13px' }}>{distance}m</div>
+            </div>
+            <div style={{ padding: '8px', background: 'rgba(0,0,0,0.3)', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: '9px' }}>SPEED</span>
+              <div style={{ fontWeight: 700, color: 'var(--electric-cyan)', fontSize: '13px' }}>{speed} m/s</div>
+            </div>
+            <div style={{ padding: '8px', background: 'rgba(0,0,0,0.3)', borderRadius: '6px', border: '1px solid var(--border-subtle)' }}>
+              <span style={{ color: 'var(--text-muted)', fontSize: '9px' }}>RECORD</span>
+              <div style={{ fontWeight: 700, color: '#ffaa00', fontSize: '13px' }}>{highScore}</div>
+            </div>
+          </div>
+        </div>
+
+        {/* Restart Action */}
+        <Button
+          variant="glass"
+          size="md"
+          icon={<RotateCcw size={15} />}
+          onClick={() => {
+            handleRestart();
+            setIsDrawerOpen(false);
+          }}
+          style={{ width: '100%', justifyContent: 'center' }}
+        >
+          Restart Run
+        </Button>
+
+        {/* Control Center & Vision Diagnostics */}
+        <ControlCenter
+          activeExperienceTitle="Gesture Runner"
+          onResetScene={handleRestart}
+        />
+      </MobileControlDrawer>
     </div>
   );
 };

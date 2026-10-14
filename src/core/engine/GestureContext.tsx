@@ -13,6 +13,8 @@ interface GestureContextValue {
   stopEngine: () => void;
   setSensitivity: (val: number) => void;
   setSmoothing: (val: number) => void;
+  showSkeleton: boolean;
+  setShowSkeleton: (val: boolean) => void;
 }
 
 const GestureContext = createContext<GestureContextValue | null>(null);
@@ -24,6 +26,7 @@ export const GestureProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const [gestureState, setGestureState] = useState<GestureState>(engine.getState());
   const [diagnostics, setDiagnostics] = useState<EngineDiagnostics>(engine.getDiagnostics());
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [showSkeleton, setShowSkeleton] = useState<boolean>(true);
 
   useEffect(() => {
     const unsubCamera = engine.onCameraStatusChange((status, error) => {
@@ -89,6 +92,8 @@ export const GestureProvider: React.FC<{ children: React.ReactNode }> = ({ child
         stopEngine,
         setSensitivity,
         setSmoothing,
+        showSkeleton,
+        setShowSkeleton,
       }}
     >
       {children}
