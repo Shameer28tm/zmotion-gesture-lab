@@ -188,19 +188,42 @@ export class RunnerEngine {
   }
 
   /**
-   * Continuous steering from normalized hand coordinate (-1 to 1)
+   * Continuous steering from normalized hand coordinate (-1 to 1) with hysteresis deadbands
+   * to eliminate rapid jitter/chatter at lane boundaries.
    */
   public setNormalizedHandX(normX: number): void {
     if (this.state !== 'PLAYING') return;
 
-    // Map [-0.8, 0.8] input to 3 lanes (-1, 0, 1) with comfortable deadbands
-    let targetLane = 0;
-    if (normX < -0.22) {
-      targetLane = -1; // Left lane
-    } else if (normX > 0.22) {
-      targetLane = 1; // Right lane
-    } else {
-      targetLane = 0; // Center lane
+    // Use hysteresis: once in an outer lane, requires moving further towards center to leave it
+    const currentLane = this.player.lane;
+    let targetLane = currentLane;
+
+    if (currentLane === 0) {
+      if (normX < -0.22) {
+        targetLane = -1; // Steer to Left lane
+      } else if (normX > 0.22) {
+        targetLane = 1; // Steer to Right lane
+      } else {
+        targetLane = 0;
+      }
+    } else if (currentLane === -1) {
+      // Must cross inward deadband threshold (-0.14) to return to center
+      if (normX > 0.22) {
+        targetLane = 1;
+      } else if (normX > -0.14) {
+        targetLane = 0;
+      } else {
+        targetLane = -1;
+      }
+    } else if (currentLane === 1) {
+      // Must cross inward deadband threshold (+0.14) to return to center
+      if (normX < -0.22) {
+        targetLane = -1;
+      } else if (normX < 0.14) {
+        targetLane = 0;
+      } else {
+        targetLane = 1;
+      }
     }
 
     this.setLane(targetLane);
@@ -371,18 +394,26 @@ export class RunnerEngine {
           passed: false,
         });
       } else if (patternChoice < 0.80) {
-        // Two obstacles across 2 lanes, leaving 1 safe lane to dodge
+        // Two obstacles across 2 lanes, leaving 1 safe lane to dodge.
+        // Guarantee at least one obstacle is a jumpable BARRIER so the player always has a jump escape route
         const safeLane = Math.floor(Math.random() * 3) - 1;
         const obstacleLanes = [-1, 0, 1].filter((l) => l !== safeLane);
+        const types: ('BARRIER' | 'PYLON')[] =
+          this.difficulty === 'EASY'
+            ? ['BARRIER', 'BARRIER']
+            : Math.random() > 0.5
+            ? ['BARRIER', 'PYLON']
+            : ['PYLON', 'BARRIER'];
 
-        obstacleLanes.forEach((lane) => {
+        obstacleLanes.forEach((lane, idx) => {
+          const type = types[idx] || 'BARRIER';
           this.obstacles.push({
             id: this.nextObstacleId++,
             lane,
             z: spawnZ,
             width: 1.3,
-            height: 1.0,
-            type: Math.random() > 0.4 ? 'BARRIER' : 'PYLON',
+            height: type === 'PYLON' ? 2.8 : 1.0,
+            type,
             passed: false,
           });
         });

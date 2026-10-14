@@ -44,5 +44,24 @@ describe('Mobile Viewports & CSS Audit (320px, 360px, 390px, 430px, Tablet & Des
   it('prevents horizontal page overflow on narrow screens', () => {
     expect(indexCss).toContain('overflow-x: hidden');
     expect(hudCss).toContain('overflow: hidden');
+    expect(hudCss).toContain('.mobile-runner-score-badge');
+  });
+
+  it('validates vercel.json configuration for Vite SPA with camera permissions and caching', () => {
+    const vercelJsonPath = path.resolve(__dirname, '../../vercel.json');
+    expect(fs.existsSync(vercelJsonPath)).toBe(true);
+
+    const vercelConfig = JSON.parse(fs.readFileSync(vercelJsonPath, 'utf8'));
+    expect(vercelConfig.framework).toBe('vite');
+    expect(vercelConfig.buildCommand).toBe('npm run build');
+    expect(vercelConfig.outputDirectory).toBe('dist');
+    expect(vercelConfig.rewrites).toEqual([{ source: '/(.*)', destination: '/index.html' }]);
+    
+    // Validate Permissions-Policy allows camera
+    const headers = vercelConfig.headers || [];
+    const globalHeader = headers.find((h: { source: string }) => h.source === '/(.*)');
+    expect(globalHeader).toBeDefined();
+    const cameraPolicy = globalHeader.headers.find((kv: { key: string }) => kv.key === 'Permissions-Policy');
+    expect(cameraPolicy.value).toContain('camera=(self)');
   });
 });

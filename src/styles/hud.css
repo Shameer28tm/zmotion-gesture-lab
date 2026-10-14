@@ -377,6 +377,10 @@
     display: none !important;
   }
 
+  .mobile-runner-score-badge {
+    display: none !important;
+  }
+
   .mobile-bar-right-actions {
     gap: 4px !important;
   }

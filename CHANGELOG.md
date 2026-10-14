@@ -3,6 +3,39 @@
 All notable changes to **ZMotion — Gesture Lab** are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-10-14
+
+### Added
+- **Production Vercel Configuration (`vercel.json`)**:
+  - Pre-configured Vite SPA build settings (`buildCommand: "npm run build"`, `outputDirectory: "dist"`).
+  - Single-page application wildcard rewrites (`/(.*) -> /index.html`) ensuring clean direct URL and hash navigation.
+  - Strict security and privacy headers, including `Permissions-Policy: camera=(self)` for HTTPS webcam authorization.
+  - Immutable 1-year caching for static asset bundles (`/assets/(.*)`).
+- **Steering Direction Calibration Setting**:
+  - Accessible Normal / Inverted horizontal steering selector added to `MobileControlDrawer` in Gesture Runner.
+  - Preserves user preference in `localStorage` (`zmotion_runner_invert_controls`).
+- **New Automated Test Suite (`runnerDirectionFix.test.ts`)**:
+  - Mathematically validates 3D camera projection into NDC screen space (Left moves to negative NDC X, Right moves to positive NDC X).
+  - Validates physical hand left/right translation to game lane transition.
+  - Validates hysteresis deadbands, sustained fist latching, fair obstacle generation, and scene controller reset.
+  - Expands total passing test coverage to **119 automated tests** across 14 test files.
+
+### Changed & Fixed
+- **Fixed Reversed Left/Right Game Movement in Gesture Runner**:
+  - **Root Cause**: The Three.js chase camera is positioned behind the player at `z = -5.2` and looks forward along the positive Z axis (`z = +9.0`). In standard right-handed 3D coordinates, looking down $+Z$ means world $+X$ projects to screen LEFT and world $-X$ projects to screen RIGHT. `RunnerSceneController` was setting `mesh.position.x = player.x` and `obs.lane * 2.2`, causing player movement and obstacle rendering to be horizontally mirrored on screen.
+  - **Fix**: Inverted the visual X mapping in `RunnerSceneController` (`this.playerGroup.position.x = -player.x;` and `mesh.position.set(-obs.lane * 2.2, ...)`), perfectly aligning screen Left with physical Left and screen Right with physical Right.
+  - **Banking Tilt Alignment**: Aligned drone banking tilt (`this.playerGroup.rotation.z = -player.tilt`) so the drone banks realistically into turns (tilting left when moving left, and right when moving right).
+  - **Keyboard & Mobile Touch Consistency**: Verified that keyboard ('A' / ArrowLeft) and touch "Left" buttons steer the player to screen Left, and ('D' / ArrowRight / "Right") steer to screen Right.
+- **Improved Runner Gameplay**:
+  - **Jitter-Free Steering with Hysteresis**: Added hysteresis deadbands in `setNormalizedHandX` ($\pm 0.22$ transition, $\pm 0.14$ inward return) to eliminate lane chattering when hand hovers near boundary thresholds.
+  - **Sustained Fist Jump Prevention**: Fixed issue where sustained fist or 1-frame tracking drops caused repeated jumps. Required grounded state, minimum 350ms cooldown, and explicit hand release (`OPEN_PALM` or non-fist finger curls) before unlatching.
+  - **Fair Obstacle Spawning**: Ensured that in `EASY` mode, whenever two lanes are blocked simultaneously, jumpable `BARRIER`s are spawned, eliminating unavoidable double-pylon traps.
+  - **Dual-Hand Steering Priority**: When both hands are in view, the primary tracked hand maintains authoritative steering to prevent conflicting inputs.
+  - **Scene Controller Reset**: Added `controller.reset()` on game start/restart to clear residual obstacle meshes and return drone transforms to origin.
+- **Mobile Responsiveness Refinement**:
+  - Added `.mobile-runner-score-badge` class and suppressed it on ultra-narrow viewports ($\le 360px$) in `hud.css` to prevent horizontal header wrapping.
+  - Added descriptive `aria-label`s to compact Photo and Record buttons in `CaptureControls.tsx`.
+
 ---
 
 ## [1.2.0] - 2026-10-14

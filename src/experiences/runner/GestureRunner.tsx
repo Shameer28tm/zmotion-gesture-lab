@@ -42,6 +42,27 @@ export const GestureRunner: React.FC = () => {
   const [multiplier, setMultiplier] = useState(1.0);
   const [isNewRecord, setIsNewRecord] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [invertSteering, setInvertSteering] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('zmotion_runner_invert_controls') === 'true';
+    } catch {
+      return false;
+    }
+  });
+
+  const invertSteeringRef = useRef(invertSteering);
+  useEffect(() => {
+    invertSteeringRef.current = invertSteering;
+  }, [invertSteering]);
+
+  const handleSetInvertSteering = useCallback((invert: boolean) => {
+    setInvertSteering(invert);
+    try {
+      localStorage.setItem('zmotion_runner_invert_controls', invert ? 'true' : 'false');
+    } catch {
+      // Ignore storage errors
+    }
+  }, []);
 
   // Initialize Scene Controller & Game Loop
   useEffect(() => {
@@ -92,27 +113,51 @@ export const GestureRunner: React.FC = () => {
     animId = requestAnimationFrame(gameLoop);
 
     let isFistCurrentlyLatched = false;
+    let lastJumpTime = 0;
 
     // High-frequency gesture listener for horizontal steering and fist unlatching
-    const unsubFrame = gestureEngine.onFrame((state) => {
+    const unsubFrame = gestureEngine.onFrame((state, _rawLandmarks, allHands) => {
       if (gameEngine.getState() === 'PLAYING') {
+        // Dual-hand support: determine primary hand for authoritative steering to prevent conflicting input
+        const primaryHand = allHands && allHands.length > 0
+          ? (allHands.find((h) => !h.isGracePeriod) || allHands[0])
+          : null;
+
+        const effectiveHandX = primaryHand?.metrics?.handCenter?.x ?? (state.handDetected ? state.metrics.handCenter.x : null);
+
+        if (effectiveHandX !== null && effectiveHandX !== undefined) {
+          const finalNormX = invertSteeringRef.current ? -effectiveHandX : effectiveHandX;
+          gameEngine.setNormalizedHandX(finalNormX);
+        }
+
+        // Fist unlatching logic:
+        // PREVENT REPEATED JUMPS FROM A SUSTAINED FIST:
+        // A jump requires an explicit hand opening and player must be grounded.
+        // If tracking momentarily drops or flickers, DO NOT unlatch!
         if (state.handDetected) {
-          gameEngine.setNormalizedHandX(state.metrics.handCenter.x);
-          if (state.activeGesture !== 'CLOSED_FIST') {
+          const playerGrounded = !gameEngine.getPlayer().isJumping;
+          const timeSinceJump = performance.now() - lastJumpTime;
+          const isFist = state.activeGesture === 'CLOSED_FIST';
+
+          if (playerGrounded && timeSinceJump > 350 && !isFist) {
             isFistCurrentlyLatched = false;
           }
-        } else {
-          isFistCurrentlyLatched = false;
         }
       }
     });
 
     // Discrete fist gesture listener with latching (1 jump per clench)
     const unsubFist = gestureEngine.onFistTrigger(() => {
-      if (gameEngine.getState() === 'PLAYING' && !isFistCurrentlyLatched) {
+      const now = performance.now();
+      if (
+        gameEngine.getState() === 'PLAYING' &&
+        !isFistCurrentlyLatched &&
+        now - lastJumpTime > 350
+      ) {
         const jumped = gameEngine.jump();
         if (jumped) {
           isFistCurrentlyLatched = true;
+          lastJumpTime = now;
         }
       }
     });
@@ -135,6 +180,7 @@ export const GestureRunner: React.FC = () => {
   const handleStartGame = useCallback(() => {
     const game = engineRef.current;
     game.start();
+    controllerRef.current?.reset();
     setGameState('PLAYING');
     setIsNewRecord(false);
   }, []);
@@ -153,6 +199,7 @@ export const GestureRunner: React.FC = () => {
   const handleRestart = useCallback(() => {
     const game = engineRef.current;
     game.restart();
+    controllerRef.current?.reset();
     setGameState('PLAYING');
     setIsNewRecord(false);
   }, []);
@@ -253,6 +300,7 @@ export const GestureRunner: React.FC = () => {
           onOpenDrawer={() => setIsDrawerOpen(true)}
           extraControls={
             <div
+              className="mobile-runner-score-badge"
               style={{
                 display: 'flex',
                 alignItems: 'center',
@@ -868,6 +916,37 @@ export const GestureRunner: React.FC = () => {
               </Button>
             ))}
           </div>
+        </div>
+
+        {/* Horizontal Steering Calibration / Direction */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--text-muted)' }}>
+              STEERING DIRECTION
+            </span>
+            <span style={{ fontFamily: 'var(--font-mono)', fontSize: '11px', color: 'var(--electric-cyan)' }}>
+              {invertSteering ? 'INVERTED' : 'NORMAL (DEFAULT)'}
+            </span>
+          </div>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px' }}>
+            <Button
+              variant={!invertSteering ? 'primary' : 'outline'}
+              size="md"
+              onClick={() => handleSetInvertSteering(false)}
+            >
+              Normal (Left = Left)
+            </Button>
+            <Button
+              variant={invertSteering ? 'primary' : 'outline'}
+              size="md"
+              onClick={() => handleSetInvertSteering(true)}
+            >
+              Inverted
+            </Button>
+          </div>
+          <span style={{ fontSize: '11px', color: 'var(--text-secondary)' }}>
+            Normal mode: moving hand to your left steers left; moving right steers right.
+          </span>
         </div>
 
         {/* Game Telemetry Stats */}

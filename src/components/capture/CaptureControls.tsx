@@ -119,6 +119,7 @@ export const CaptureControls: React.FC<CaptureControlsProps> = ({
           onClick={handleCapturePhoto}
           disabled={isCapturingPhoto || isRecording}
           title="Capture Snapshot (100% Client-Side Privacy)"
+          aria-label="Capture photo snapshot"
           style={compact ? { padding: '6px 10px', minHeight: '36px' } : {}}
         >
           {compact ? '' : 'PHOTO'}
@@ -131,6 +132,7 @@ export const CaptureControls: React.FC<CaptureControlsProps> = ({
           icon={isRecording ? <Square size={13} /> : <Video size={13} />}
           onClick={handleToggleRecord}
           title={isRecording ? 'Stop Recording' : 'Record Short Video (100% Client-Side Privacy)'}
+          aria-label={isRecording ? `Stop video recording (${recordSeconds} seconds)` : 'Start recording video'}
           style={{
             ...(compact ? { padding: '6px 10px', minHeight: '36px' } : {}),
             ...(isRecording ? { background: '#ff3366', color: '#fff', borderColor: '#ff3366' } : {}),

@@ -7,7 +7,7 @@
 [![Vite](https://img.shields.io/badge/Vite-6-purple.svg)](https://vitejs.dev/)
 [![Three.js](https://img.shields.io/badge/Three.js-0.174-black.svg)](https://threejs.org/)
 [![MediaPipe](https://img.shields.io/badge/MediaPipe-Tasks_Vision-00d2ff.svg)](https://developers.google.com/mediapipe)
-[![Tests](https://img.shields.io/badge/Vitest-109%20Passed-success.svg)](https://vitest.dev/)
+[![Tests](https://img.shields.io/badge/Vitest-119%20Passed-success.svg)](https://vitest.dev/)
 [![CI](https://github.com/Shameer28tm/zmotion-gesture-lab/actions/workflows/ci.yml/badge.svg)](https://github.com/Shameer28tm/zmotion-gesture-lab/actions/workflows/ci.yml)
 [![Privacy: 100% Client-Side](https://img.shields.io/badge/Privacy-100%25%20Client--Side-brightgreen.svg)](#100-user-side-privacy-guarantee)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](./LICENSE)
@@ -202,6 +202,30 @@ npm run build
 # Preview production build locally
 npm run preview
 ```
+
+---
+
+## Vercel Production Deployment
+
+ZMotion is pre-configured for zero-friction Vercel deployment via `vercel.json`:
+* **Framework Preset**: Vite
+* **Build Command**: `npm run build`
+* **Output Directory**: `dist`
+* **Routing**: Automatic SPA rewrites (`/(.*) -> /index.html`) with hash router fallback (`#studio`, `#particles`, `#runner`).
+* **Permissions Policy**: `camera=(self)` pre-authorized for HTTPS webcam spatial tracking.
+* **Asset Caching**: 1-year immutable caching for Three.js and MediaPipe code-split chunks.
+
+### Deploying to Vercel (1-Click or CLI):
+1. **GitHub Integration (Recommended)**:
+   - Import `https://github.com/Shameer28tm/zmotion-gesture-lab` in the [Vercel Dashboard](https://vercel.com/new).
+   - Vercel automatically detects the Vite framework and `vercel.json` configuration.
+   - Click **Deploy**. Continuous deployment triggers on every git push to `main`.
+2. **Vercel CLI**:
+   ```bash
+   npm i -g vercel
+   vercel
+   vercel --prod
+   ```
 
 ---
 

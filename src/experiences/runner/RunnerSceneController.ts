@@ -230,7 +230,31 @@ export class RunnerSceneController {
   public triggerExplosion(): void {
     // Visually perturb drone orientation upon impact
     this.playerGroup.rotation.x = 0.45;
-    this.playerGroup.rotation.z = 0.7;
+    this.playerGroup.rotation.z = -0.7;
+  }
+
+  /**
+   * Reset all dynamic 3D scene entities (obstacles, player transforms) on game restart
+   */
+  public reset(): void {
+    for (const mesh of this.obstacleMeshes.values()) {
+      this.scene?.remove(mesh);
+    }
+    this.obstacleMeshes.clear();
+
+    if (this.playerGroup) {
+      this.playerGroup.position.set(0, 0.5, 0);
+      this.playerGroup.rotation.set(0, 0, 0);
+    }
+    this.gridZOffset = 0;
+  }
+
+  public getPlayerGroup(): Group {
+    return this.playerGroup;
+  }
+
+  public getCamera(): PerspectiveCamera | null {
+    return this.camera;
   }
 
   public updateFromEngine(engine: RunnerEngine, dt: number): void {
@@ -238,9 +262,13 @@ export class RunnerSceneController {
     const obstacles = engine.getObstacles();
 
     // 1. Sync Player Mesh Position & Tilt
-    this.playerGroup.position.x = player.x;
+    // NOTE: Because camera is located at z = -5.2 and looks forward along +Z,
+    // world +X projects to screen LEFT and world -X projects to screen RIGHT.
+    // Invert X coordinate mapping (-player.x) so that moving left (player.x < 0)
+    // projects to screen LEFT (NDC x < 0), and moving right projects to screen RIGHT.
+    this.playerGroup.position.x = -player.x;
     this.playerGroup.position.y = 0.5 + player.y;
-    this.playerGroup.rotation.z = player.tilt;
+    this.playerGroup.rotation.z = -player.tilt;
     this.playerGroup.rotation.x = player.isJumping ? -0.15 : 0;
 
     // 2. Animate Track Cross-Ties (Stream backward to create hyperspace speed)
@@ -265,8 +293,8 @@ export class RunnerSceneController {
         this.scene?.add(mesh);
       }
 
-      // Position mesh
-      mesh.position.set(obs.lane * 2.2, obs.height / 2, obs.z);
+      // Position mesh (negate X to match camera +Z projection and player alignment)
+      mesh.position.set(-obs.lane * 2.2, obs.height / 2, obs.z);
 
       // Rotate energy orbs
       if (obs.type === 'ENERGY_ORB') {
